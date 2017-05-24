@@ -4,6 +4,8 @@
 
 # OWASP DeepViolet TLS/SSL Tools
 
+NOTE: This project is not integrated with Travis or MavenCentral at the moment. 
+<p/>
 [WIKI/How to Build](https://github.com/spoofzu/DeepViolet/wiki/Build-on-Your-Computer) | 
 [DV API JavaDocs](https://spoofzu.github.io/DeepViolet/) | 
 [OWASP Project Page](https://www.owasp.org/index.php/OWASP_DeepViolet_TLS/SSL_Scanner) | 
