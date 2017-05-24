@@ -2,9 +2,7 @@
 [![Black Hat Arsenal](https://www.toolswatch.org/badges/arsenal/2016.svg)](http://www.blackhat.com/eu-16/arsenal.html#milton-smith)
 <p/>
 
-<h1>OWASP DeepViolet TLS/SSL Tools</h1><br/>
-==========
-<p/>
+<h1>OWASP DeepViolet TLS/SSL Tools</h1>
 [WIKI/How to Build](https://github.com/spoofzu/DeepViolet/wiki/Build-on-Your-Computer) | 
 [DV API JavaDocs](https://spoofzu.github.io/DeepViolet/) | 
 [OWASP Project Page](https://www.owasp.org/index.php/OWASP_DeepViolet_TLS/SSL_Scanner) | 
