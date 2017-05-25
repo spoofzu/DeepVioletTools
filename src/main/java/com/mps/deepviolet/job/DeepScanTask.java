@@ -287,21 +287,15 @@ public class DeepScanTask extends UIBackgroundTask {
 		
 				for( IDVCipherSuite cipher : ciphers ) {
 					
-					if( tmap.containsKey(cipher.getSuiteName()) ) {
-						// If the cipher belongs to another handshake
-						// protcol then skip.  Only want uniquely named 
-						// ciphersuites.
-					}else{
-						StringBuffer buff = new StringBuffer();
-						buff.append( cipher.getSuiteName());
-						buff.append( " (" ); 
-						buff.append( cipher.getStrengthEvaluation() );
-						buff.append( ',' );
-						buff.append( cipher.getHandshakeProtocol() );
-						buff.append( ')');
-						println( buff.toString() );
-						tmap.put(cipher.getSuiteName(), cipher.getStrengthEvaluation());
-					}
+					StringBuffer buff = new StringBuffer();
+					buff.append( cipher.getSuiteName());
+					buff.append( " (" ); 
+					buff.append( cipher.getStrengthEvaluation() );
+					buff.append( ',' );
+					buff.append( cipher.getHandshakeProtocol() );
+					buff.append( ')');
+					println( buff.toString() );
+					tmap.put(cipher.getSuiteName(), cipher.getStrengthEvaluation());
 					
 				}
 			
