@@ -258,8 +258,8 @@ public class DeepScanTask extends UIBackgroundTask {
 //        	return;
 //		}
 		
-		String[] connection_properties = session.getPropertyNames();
-		for( String key : connection_properties ) {
+		IDVSession.SESSION_PROPERTIES[] connection_properties = session.getPropertyNames();
+		for( IDVSession.SESSION_PROPERTIES key : connection_properties ) {
 			
         	println( key+"="+session.getPropertyValue(key) );
         	
