@@ -1,4 +1,4 @@
-package com.mps.deepviolet.bin;
+package com.mps.deepviolettools.bin;
 
 import java.awt.Image;
 import java.awt.Toolkit;
@@ -11,9 +11,9 @@ import javax.swing.UIManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mps.deepviolet.ui.MainFrm;
 import com.mps.deepviolet.util.FileUtils;
-import com.mps.deepviolet.util.LogUtils;
+import com.mps.deepviolettools.ui.MainFrm;
+import com.mps.deepviolettools.util.LogUtils;
 
 /**
  * Entry point to start DeepViolet and display a user interface.
@@ -28,7 +28,7 @@ public class StartUI {
 		LogUtils.logInit();
 	}
 
-	private static final Logger logger = LoggerFactory.getLogger("com.mps.deepviolet.bin.StartUI");
+	private static final Logger logger = LoggerFactory.getLogger("com.mps.deepviolettools.bin.StartUI");
 
 	/**
 	 * Main entry point

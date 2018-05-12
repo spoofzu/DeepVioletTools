@@ -1,4 +1,4 @@
-package com.mps.deepviolet.bin;
+package com.mps.deepviolettools.bin;
 
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -17,9 +17,9 @@ import org.apache.commons.cli.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mps.deepviolet.job.DeepScanTask;
 import com.mps.deepviolet.util.FileUtils;
-import com.mps.deepviolet.util.LogUtils;
+import com.mps.deepviolettools.job.DeepScanTask;
+import com.mps.deepviolettools.util.LogUtils;
 
 /**
  * Entry point to start DeepViolet and run headless. Useful for running
@@ -35,7 +35,7 @@ public class StartCMD {
 		LogUtils.logInit();
 	}
 
-	public static final Logger logger = LoggerFactory.getLogger("com.mps.deepviolet.bin.StartCMD");
+	public static final Logger logger = LoggerFactory.getLogger("com.mps.deepviolettools.bin.StartCMD");
 
 	private static final String EOL = System.getProperty("line.separator");
 
@@ -274,7 +274,7 @@ public class StartCMD {
 	private void updateLongRunningCMDStatus(final DeepScanTask task) {
 
 		// Instance logger. Need to define working dir before we can create.
-		final Logger logger = LoggerFactory.getLogger("com.mps.deepviolet.bin.StartCMD");
+		final Logger logger = LoggerFactory.getLogger("com.mps.deepviolettools.bin.StartCMD");
 
 		// Background update thread. Display scan results in progress
 		final int delay = 500; // Update interval

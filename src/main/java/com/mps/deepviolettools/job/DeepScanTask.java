@@ -1,20 +1,11 @@
-package com.mps.deepviolet.job;
+package com.mps.deepviolettools.job;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+
 import java.net.URL;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
-import javax.net.ssl.SSLHandshakeException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,8 +16,11 @@ import com.mps.deepviolet.api.IDVCipherSuite;
 import com.mps.deepviolet.api.IDVEng;
 import com.mps.deepviolet.api.IDVHost;
 import com.mps.deepviolet.api.IDVSession;
+import com.mps.deepviolet.api.IDVSession.SESSION_PROPERTIES;
 import com.mps.deepviolet.api.IDVX509Certificate;
 import com.mps.deepviolet.api.IDVX509Certificate.ValidState;
+
+import com.mps.deepviolettools.job.UIBackgroundTask;
 
 /**
  * Coordinates the order and execution of scan tasks
@@ -36,7 +30,7 @@ import com.mps.deepviolet.api.IDVX509Certificate.ValidState;
 public class DeepScanTask extends UIBackgroundTask {
 
 	private static final Logger logger = LoggerFactory
-			.getLogger("com.mps.deepviolet.job.UIBackgroundTask");
+			.getLogger("com.mps.deepviolettools.job.UIBackgroundTask");
 
 	private final String EOL = System.getProperty("line.separator");
 	protected volatile StringBuffer con = new StringBuffer();
@@ -53,7 +47,7 @@ public class DeepScanTask extends UIBackgroundTask {
 	public volatile boolean bCiperSuitSection = true;
 	public volatile boolean bServerCertficateSection = true;
 	public volatile boolean bCertChainSection = true;
-	// public volatile boolean bServerAnalysisSection = false;
+	public volatile boolean bServerAnalysisSection = true;
 	public volatile boolean bWriteCertificate = false;
 	public volatile boolean bReadCertificate = false;
 
@@ -102,7 +96,7 @@ public class DeepScanTask extends UIBackgroundTask {
 	}
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printReportHeader()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printReportHeader()
 	 */
 	public void printReportHeader() {
 		
@@ -149,7 +143,7 @@ public class DeepScanTask extends UIBackgroundTask {
 }
 
 //	/* (non-Javadoc)
-//	 * @see com.mps.deepviolet.api.IDVPrint#printCertificate(java.lang.String)
+//	 * @see com.mps.deepviolettools.api.IDVPrint#printCertificate(java.lang.String)
 //	 */
 //	public void printCertificate( String file ) {
 //		
@@ -183,7 +177,7 @@ public class DeepScanTask extends UIBackgroundTask {
 //}
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printHostInformation()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printHostInformation()
 	 */
 	public void printHostInformation() {
 		
@@ -212,7 +206,7 @@ public class DeepScanTask extends UIBackgroundTask {
 }
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printHostHttpResponseHeaders()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printHostHttpResponseHeaders()
 	 */
 	public void printHostHttpResponseHeaders( ) {
 		
@@ -244,7 +238,7 @@ public class DeepScanTask extends UIBackgroundTask {
 	}
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printConnectionCharacteristics()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printConnectionCharacteristics()
 	 */
 	public void printConnectionCharacteristics() {
 		
@@ -268,7 +262,7 @@ public class DeepScanTask extends UIBackgroundTask {
 }
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printSupportedCipherSuites()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printSupportedCipherSuites()
 	 */
 	public void printSupportedCipherSuites() {
 		
@@ -310,13 +304,11 @@ public class DeepScanTask extends UIBackgroundTask {
         	println("Problem processing server ciphers. err="+e.getMessage() );
 			println("");
         	logger.error("Problem processing server ciphers. err="+e.getMessage(),e);
-		}
-
-			
-}
+		}	
+	}
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printServerCertificateChain()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printServerCertificateChain()
 	 */
 	public void printServerCertificateChain() {
 		
@@ -401,13 +393,12 @@ public class DeepScanTask extends UIBackgroundTask {
 			println("Problem fetching certificates. err="+e.getMessage() );
 			println("");
 			logger.error("Problem fetching certificates. err="+e.getMessage(),e );
-		}
-		
+		}	
 	
-}
+	}
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printServerCertificate()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printServerCertificate()
 	 */
 	public void printServerCertificate() {
 		
@@ -415,11 +406,8 @@ public class DeepScanTask extends UIBackgroundTask {
 		println( "[Server certificate information]" );
 		
 	    printTrustState( dvCert );
-		
-    	printX509Certificate( dvCert );
-	   
-	        
-}
+    		printX509Certificate( dvCert );        
+	}
 	
 	/**
 	 * Print a IDVX509Certificate instance.
@@ -470,7 +458,7 @@ public class DeepScanTask extends UIBackgroundTask {
 }
 	
 	/* (non-Javadoc)
-	 * @see com.mps.deepviolet.api.IDVPrint#printTrustState()
+	 * @see com.mps.deepviolettools.api.IDVPrint#printTrustState()
 	 */
 	private void printTrustState( IDVX509Certificate ldvCert) {
 		
@@ -529,7 +517,31 @@ public class DeepScanTask extends UIBackgroundTask {
 			println( key +"="+value);
 		}
 		
-}
+	}
+	
+	private final void printServerAnalysis() {
+	
+		println("");
+		println("[Server Analysis]");
+		
+		try {
+		
+			println( "MINIMAL_ENCRYPTION_STRENGTH="+eng.getPropertyValue("MINIMAL_ENCRYPTION_STRENGTH"));
+			println( "ACHIEVABLE_ENCRYPTION_STRENGTH="+eng.getPropertyValue("ACHIEVABLE_ENCRYPTION_STRENGTH"));
+			println( "BEAST_VULNERABLE="+eng.getPropertyValue("BEAST_VULNERABLE"));
+			println( "CRIME_VULNERABLE="+eng.getPropertyValue("CRIME_VULNERABLE"));
+			println( "FREAK_VULNERABLE="+eng.getPropertyValue("FREAK_VULNERABLE"));
+			println( "ROBOT_VULNERABLE="+eng.getPropertyValue("ROBOT_VULNERABLE"));
+			
+		} catch( DVException e ) {
+			String err = "Error performing server analysis="
+					+ e.getMessage();
+			println(err);
+			logger.error(err, e);
+		}
+			
+			
+	}
 	
 	/**
 	 * Execute sections of a scan report. Set the status bar message on each
@@ -617,13 +629,13 @@ public class DeepScanTask extends UIBackgroundTask {
 
 		}
 
-		// if( bServerAnalysisSection ) {
-		//
-		// setStatusBarMessage("Working on Server Analysis");
-		//
-		// DVPrint.printServerAnalysis();
-		//
-		// }
+		 if( bServerAnalysisSection ) {
+		
+			 setStatusBarMessage("Working on Server Analysis");
+		
+		 	 printServerAnalysis();
+		
+		 }
 	}
 
 }

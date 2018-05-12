@@ -1,4 +1,4 @@
-package com.mps.deepviolet.ui;
+package com.mps.deepviolettools.ui;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -38,9 +38,10 @@ import javax.swing.text.StyledDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.mps.deepviolet.job.DeepScanTask;
-import com.mps.deepviolet.job.UIBackgroundTask;
 import com.mps.deepviolet.util.FileUtils;
+
+import com.mps.deepviolettools.job.DeepScanTask;
+import com.mps.deepviolettools.job.UIBackgroundTask;
 
 /**
  * Build main application UI used by StartUI. Creates the JFrame and deploys
@@ -52,7 +53,7 @@ import com.mps.deepviolet.util.FileUtils;
 public class MainFrm extends JFrame {
 
 	private static final Logger logger = LoggerFactory
-			.getLogger("com.mps.deepviolet.ui.MainFrm");
+			.getLogger("com.mps.deepviolettools.ui.MainFrm");
 
 	private static final long serialVersionUID = -7591324908851824818L;
 	private JTextField txtServer;
