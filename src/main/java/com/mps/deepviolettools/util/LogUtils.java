@@ -1,6 +1,8 @@
-package com.mps.deepviolet.util;
+package com.mps.deepviolettools.util;
 
 import org.slf4j.LoggerFactory;
+
+import com.mps.deepviolet.util.FileUtils;
 
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.util.ContextInitializer;

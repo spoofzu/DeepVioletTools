@@ -1,4 +1,4 @@
-package com.mps.deepviolet.job;
+package com.mps.deepviolettools.job;
 
 /**
  * A UI background task to do the scanning.
