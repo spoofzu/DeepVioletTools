@@ -245,18 +245,8 @@ public class DeepScanTask extends UIBackgroundTask {
 		println( "" );
 		println( "[Connection characteristics]" );
 		
-//		IDVHost[] dvhosts = this.dvHosts;
-//		
-//		if( dvhosts.length < 1 ) {
-//        	println("No host data returned. err=dvhost is null");
-//        	return;
-//		}
-		
-		IDVSession.SESSION_PROPERTIES[] connection_properties = session.getPropertyNames();
-		for( IDVSession.SESSION_PROPERTIES key : connection_properties ) {
-			
-        	println( key+"="+session.getPropertyValue(key) );
-        	
+		for (IDVSession.SESSION_PROPERTIES key: IDVSession.SESSION_PROPERTIES.values() ) {	
+			println( key+"="+session.getSessionPropertyValue(key));
 		}
 			
 }
@@ -524,22 +514,10 @@ public class DeepScanTask extends UIBackgroundTask {
 		println("");
 		println("[Server Analysis]");
 		
-		try {
-		
-			println( "MINIMAL_ENCRYPTION_STRENGTH="+eng.getPropertyValue("MINIMAL_ENCRYPTION_STRENGTH"));
-			println( "ACHIEVABLE_ENCRYPTION_STRENGTH="+eng.getPropertyValue("ACHIEVABLE_ENCRYPTION_STRENGTH"));
-			println( "BEAST_VULNERABLE="+eng.getPropertyValue("BEAST_VULNERABLE"));
-			println( "CRIME_VULNERABLE="+eng.getPropertyValue("CRIME_VULNERABLE"));
-			println( "FREAK_VULNERABLE="+eng.getPropertyValue("FREAK_VULNERABLE"));
-			println( "ROBOT_VULNERABLE="+eng.getPropertyValue("ROBOT_VULNERABLE"));
-			
-		} catch( DVException e ) {
-			String err = "Error performing server analysis="
-					+ e.getMessage();
-			println(err);
-			logger.error(err, e);
+		for (IDVSession.VULNERABILITY_ASSESSMENTS property: IDVSession.VULNERABILITY_ASSESSMENTS.values() ) {
+			println( property+"="+session.getVulnerabilityAssessmentValue(property));
 		}
-			
+	
 			
 	}
 	
