@@ -27,7 +27,7 @@ java -jar dvCMD.jar -serverurl https://www.github.com/ -s thrcisn
 ![dvcmd-snapshot](https://cloud.githubusercontent.com/assets/8450615/15344407/8209d2ba-1c5b-11e6-9321-3397ba35359d.png)
 
 ## Acknowledgements
-This tool impliments ideas, code, and takes inspriation from other projects and leaders like: Qualys SSL Labs and Ivan Ristić, OpenSSL, and Oracle's Java Security Team.  Many thanks for around negotiating TLS/SSL handshakes and cipher suite handling adapted from code examples by Thomas Pornin.
+This tool impliments ideas, code, and takes inspriation from other projects and leaders like: Qualys SSL Labs and Ivan Ristić, OpenSSL, and Oracle's Java Security Team.  Many thanks negotiating TLS/SSL handshakes and ciphersuite handling adapted from code examples by Thomas Pornin.
 
 Looking for more information?  See the [project wiki](https://github.com/spoofzu/DeepVioletTools/wiki) or the [API wiki](https://github.com/spoofzu/DeepViolet/wiki)
 
