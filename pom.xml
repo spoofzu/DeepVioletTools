@@ -24,7 +24,7 @@
         </developer>
     </developers>
     <dependencies>
-        <!--  DeeepViolet Staging -->
+        <!--  DeeepViolet Staging  -->
         <dependency>
             <groupId>com.github.spoofzu</groupId>
             <artifactId>DeepViolet</artifactId>
