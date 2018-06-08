@@ -8,8 +8,6 @@
 [OWASP Project Page](https://www.owasp.org/index.php/OWASP_DeepViolet_TLS/SSL_Scanner) | 
 [Reference Screenshots](https://github.com/spoofzu/DeepVioletTools/wiki)
 
-NOTE: This project is not integrated with Travis or MavenCentral at the moment. 
-
 DeepViolet is a TLS/SSL scanning API written in Java. To keep DeepViolet easy to use, identify bugs, reference implementations have been developed in this project that consume the DeepViolet API. If you want to see what DeepViolet can do, use it from the command line in your scripts or use the graphical tool from the comfort of your desktop. Both tools can be used to scan HTTPS web servers to check server certificate trust chains, revocation status, check certificates for pending expiration, weak signing algorithms and much more.  Original blog article post describing this project, http://www.securitycurmudgeon.com/2014/07/ssltls-introspection.html
 
 ## ACKNOWLEDGEMENTS
