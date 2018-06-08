@@ -4,7 +4,7 @@
 ## OWASP DeepViolet TLS/SSL Tools
 
 [WIKI/How to Build](https://github.com/spoofzu/DeepViolet/wiki/Build-on-Your-Computer) | 
-[DV API JavaDocs](https://spoofzu.github.io/DeepViolet/) | 
+[DV API JavaDocs](https://github.com/spoofzu/DeepViolet/wiki/Hardhats) | 
 [OWASP Project Page](https://www.owasp.org/index.php/OWASP_DeepViolet_TLS/SSL_Scanner) | 
 [Reference Screenshots](https://github.com/spoofzu/DeepVioletTools/wiki)
 
