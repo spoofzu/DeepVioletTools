@@ -1,5 +1,6 @@
 [![Build Status](https://travis-ci.org/spoofzu/DeepVioletTools.svg?branch=master)](https://travis-ci.org/spoofzu/DeepVioletTools)
 [![Black Hat Arsenal](https://www.toolswatch.org/badges/arsenal/2016.svg)](http://www.blackhat.com/eu-16/arsenal.html#milton-smith)
+[![Black Hat Arsenal](https://github.com/toolswatch/badges/blob/master/arsenal/usa/2018.svg)](https://www.blackhat.com/us-18/arsenal/schedule/index.html#deepviolet-ssltls-scanning-api-38-tools-10724)
 
 ## OWASP DeepVioletTools
 
