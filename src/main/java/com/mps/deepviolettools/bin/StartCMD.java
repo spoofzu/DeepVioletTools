@@ -18,7 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.mps.deepviolet.util.FileUtils;
-import com.mps.deepviolettools.job.DeepScanTask;
+import com.mps.deepviolettools.job.UIBackgroundScanTask;
 import com.mps.deepviolettools.util.LogUtils;
 
 /**
@@ -161,7 +161,7 @@ public class StartCMD {
 			// Background SSL scanning thread
 			String filename = cmdline.hasOption("rc") ? cmdline.getOptionValue("rc") : cmdline.getOptionValue("wc");
 			URL url = cmdline.hasOption("u") ? new URL(cmdline.getOptionValue("u")) : null;
-			final DeepScanTask st = new DeepScanTask(url);
+			final UIBackgroundScanTask st = new UIBackgroundScanTask(url);
 
 			st.bReadCertificate = cmdline.hasOption("rc");
 			st.bWriteCertificate = cmdline.hasOption("wc");
@@ -271,7 +271,7 @@ public class StartCMD {
 	 * 
 	 * @param task
 	 */
-	private void updateLongRunningCMDStatus(final DeepScanTask task) {
+	private void updateLongRunningCMDStatus(final UIBackgroundScanTask task) {
 
 		// Instance logger. Need to define working dir before we can create.
 		final Logger logger = LoggerFactory.getLogger("com.mps.deepviolettools.bin.StartCMD");

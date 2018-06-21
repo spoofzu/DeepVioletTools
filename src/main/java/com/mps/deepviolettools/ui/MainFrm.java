@@ -38,10 +38,10 @@ import javax.swing.text.StyledDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.mps.deepviolet.api.DVBackgroundTask;
 import com.mps.deepviolet.util.FileUtils;
 
-import com.mps.deepviolettools.job.DeepScanTask;
-import com.mps.deepviolettools.job.UIBackgroundTask;
+import com.mps.deepviolettools.job.UIBackgroundScanTask;
 
 /**
  * Build main application UI used by StartUI. Creates the JFrame and deploys
@@ -237,7 +237,7 @@ public class MainFrm extends JFrame {
 		// Button listener to start the scan.
 		btnDeepScan.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				selectionBtnDeepScanPressed();
+				selectionScanPressed();
 			}
 		});
 
@@ -256,7 +256,7 @@ public class MainFrm extends JFrame {
 	 * Action when scanned pressed. Basically, setup the background tasks and
 	 * execute.
 	 */
-	private void selectionBtnDeepScanPressed() {
+	private void selectionScanPressed() {
 
 		setEnableControls(false);
 
@@ -301,9 +301,9 @@ public class MainFrm extends JFrame {
 		}
 
 		// Background SSL scanning thread
-		DeepScanTask st = null;
+		UIBackgroundScanTask st = null;
 		try {
-			st = new DeepScanTask(url);
+			st = new UIBackgroundScanTask(url);
 		} catch (Exception e) {
 			String msg = "";
 			if (url.getHost().equals(e.getMessage())) {
@@ -333,14 +333,14 @@ public class MainFrm extends JFrame {
 	 * @param task
 	 *            Current task.
 	 */
-	private void updateLongRunningUIStatus(final UIBackgroundTask task) {
+	private void updateLongRunningUIStatus(final DVBackgroundTask task) {
 
 		final Style regular = doc.getStyle("regular");
 		// final Style sectionhead = doc.getStyle("sectionhead");
 		// final Style error = doc.getStyle("error");
 
 		// Background UI update thread. Display scan results in progress
-		int delay = 500; // UI update interval
+		int delay = 150; // UI update interval
 		ActionListener taskPerformer = new ActionListener() {
 			long s1 = System.currentTimeMillis();
 
@@ -460,7 +460,6 @@ public class MainFrm extends JFrame {
 
 		StringBuffer buff = new StringBuffer();
 
-		buff.append(STATUS_HDR);
 		buff.append(phase);
 		txtStatus.setText(buff.toString());
 	}
