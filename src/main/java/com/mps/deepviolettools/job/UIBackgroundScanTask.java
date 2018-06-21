@@ -10,27 +10,27 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.mps.deepviolet.api.DVBackgroundTask;
 import com.mps.deepviolet.api.DVException;
 import com.mps.deepviolet.api.DVFactory;
 import com.mps.deepviolet.api.IDVCipherSuite;
 import com.mps.deepviolet.api.IDVEng;
 import com.mps.deepviolet.api.IDVHost;
 import com.mps.deepviolet.api.IDVSession;
+import com.mps.deepviolet.api.IDVSession.CIPHER_NAME_CONVENTION;
 import com.mps.deepviolet.api.IDVSession.SESSION_PROPERTIES;
 import com.mps.deepviolet.api.IDVX509Certificate;
 import com.mps.deepviolet.api.IDVX509Certificate.ValidState;
-
-import com.mps.deepviolettools.job.UIBackgroundTask;
 
 /**
  * Coordinates the order and execution of scan tasks
  * 
  * @author Milton Smith
  */
-public class DeepScanTask extends UIBackgroundTask {
+public class UIBackgroundScanTask extends DVBackgroundTask {
 
 	private static final Logger logger = LoggerFactory
-			.getLogger("com.mps.deepviolettools.job.UIBackgroundTask");
+			.getLogger("com.mps.deepviolettools.job.UIBackgroundScanTask");
 
 	private final String EOL = System.getProperty("line.separator");
 	protected volatile StringBuffer con = new StringBuffer();
@@ -62,13 +62,10 @@ public class DeepScanTask extends UIBackgroundTask {
 	 * @throws DVException
 	 *             thrown on host initialization problems
 	 */
-	public DeepScanTask(URL url) throws DVException {
+	public UIBackgroundScanTask(URL url) throws DVException {
 
 		this.url = url;
-		this.session = DVFactory.initializeSession(url);
-		eng = DVFactory.getDVEng(session);
-		dvCert = eng.getCertificate();
-		dvHosts = session.getHostInterfaces();
+
 
 	}
 
@@ -526,11 +523,21 @@ public class DeepScanTask extends UIBackgroundTask {
 	 * step for the user
 	 */
 	protected void doInBackground() throws Exception {
+		
+		// Initialize the DV libraries.
+		setStatusBarMessage("Initializing scanning engine.");
+		this.session = DVFactory.initializeSession(url);
+		eng = DVFactory.getDVEng(session, CIPHER_NAME_CONVENTION.IANA, this );
+		setStatusBarMessage("Fetch server TLS certificate.");
+		dvCert = eng.getCertificate();
+		setStatusBarMessage("Fetch server interfaces.");
+		dvHosts = session.getHostInterfaces();
+		setStatusBarMessage("Initialization complete.");
 
 		if (bHeader) {
 
 			setStatusBarMessage("Working on Report Header");
-
+			
 			printReportHeader();
 
 		}
