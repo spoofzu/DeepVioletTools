@@ -3,12 +3,8 @@
 [![Black Hat Arsenal](https://github.com/toolswatch/badges/blob/master/arsenal/usa/2018.svg)](https://www.blackhat.com/us-18/arsenal/schedule/index.html#deepviolet-ssltls-scanning-api-38-tools-10724)
 
 *********************************************************************
-THIS PROJECT IS ON HOLD AND NOT BEING MAINTAINED.  I DON'T
-RECOMMEND YOU USE THIS CODE FOR ANYTHING IMPORTANT. I'M KEEPING THE 
-REPO AVAILABLE FOR THOESE INTERESTED IN THE CODE.  THE PROJECT WAS
-A FUN EXPERIMENT AND IT WAS EXCITING TO SHARE IT
-WITH EVERYONE.  HOWEVER, AT THIS TIME, I'M PLACING MY TIME AND
-ENERGY INTO OTHER AREAS.  JUN 27, 2019 --MILTON                                             
+THIS PROJECT IS NOT BEING ACTIVELY MAINTAINED.  SEE DEEPVIOLET 
+PROJECT NOTES FOR MORE DETAILS.  JUN 27, 2019 --MILTON                                             
 *********************************************************************
 
 ## OWASP DeepVioletTools
