@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- dv-logback-v4 -->
+<configuration>
+
+  <property name="MSG_FMT" value="%d{yyyy-MM-dd HH:mm:ss} | %5level | %logger{30} | %msg%n" />
+
+  <appender name="SCANLOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${dv.log.dir}/scanlog.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <fileNamePattern>${dv.log.dir}/scanlog.%i.log</fileNamePattern>
+      <minIndex>1</minIndex>
+      <maxIndex>3</maxIndex>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <maxFileSize>3MB</maxFileSize>
+    </triggeringPolicy>
+    <encoder>
+      <pattern>${MSG_FMT}</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="AICHATLOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${dv.log.dir}/aichat.log</file>
+    <immediateFlush>true</immediateFlush>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <fileNamePattern>${dv.log.dir}/aichat.%i.log</fileNamePattern>
+      <minIndex>1</minIndex>
+      <maxIndex>3</maxIndex>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <maxFileSize>3MB</maxFileSize>
+    </triggeringPolicy>
+    <encoder>
+      <pattern>${MSG_FMT}</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="ERRORLOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${dv.log.dir}/error.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <fileNamePattern>${dv.log.dir}/error.%i.log</fileNamePattern>
+      <minIndex>1</minIndex>
+      <maxIndex>3</maxIndex>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <maxFileSize>3MB</maxFileSize>
+    </triggeringPolicy>
+    <encoder>
+      <pattern>${MSG_FMT}</pattern>
+    </encoder>
+  </appender>
+
+   <!-- sink logback messages for now, noisy -->
+   <logger name="ch.qos.logback" level="ERROR" additivity="false" />
+
+  <logger name="scanlog" level="INFO">
+    <appender-ref ref="SCANLOG" />
+  </logger>
+
+  <logger name="aichat" level="INFO" additivity="false">
+    <appender-ref ref="AICHATLOG" />
+  </logger>
+
+  <!-- All errors go to error.log only, not to console.
+       Covers both DeepViolet API (com.mps.deepviolet) and
+       DeepVioletTools (com.mps.deepviolettools). -->
+  <logger name="com.mps.deepviolet" level="DEBUG" additivity="false">
+    <appender-ref ref="ERRORLOG" />
+  </logger>
+
+  <root level="OFF" />
+
+</configuration>

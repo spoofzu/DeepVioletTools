@@ -1,117 +1,237 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project
-    xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <groupId>com.mps.violet</groupId>
     <artifactId>DeepVioletTools</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
-    <name>DeepViolet</name>
-    <description>SSL/TLS security tools.</description>
-    <url>https://github.com/spoofzu/DeepViolet/</url>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>DeepVioletTools</name>
+    <description>TLS/SSL security scanning tools - GUI and CLI reference implementations for the DeepViolet API.</description>
+    <url>https://github.com/spoofzu/DeepVioletTools/</url>
+
     <licenses>
         <license>
             <name>The Apache License, Version 2.0</name>
             <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
         </license>
     </licenses>
+
     <developers>
         <developer>
             <name>Milton Smith</name>
-            <email>milton.smith.rr@gmail.com</email>
-            <organization>Self</organization>
-            <organizationUrl>http://www.securitycurmudgeon.com/</organizationUrl>
+            <email>milton.smith@owasp.org</email>
+            <organization>OWASP</organization>
+            <organizationUrl>https://www.owasp.org/index.php/OWASP_DeepViolet_TLS/SSL_Scanner</organizationUrl>
         </developer>
     </developers>
-    <dependencies> 
-		<dependency>
-		  <groupId>com.github.spoofzu</groupId>
-		  <artifactId>DeepViolet</artifactId>
-		  <version>5.1.16</version>
-		</dependency>
-        <!-- https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-databind -->
+
+    <scm>
+        <connection>scm:git:git://github.com/spoofzu/DeepVioletTools.git</connection>
+        <developerConnection>scm:git:ssh://github.com:spoofzu/DeepVioletTools.git</developerConnection>
+        <url>https://github.com/spoofzu/DeepVioletTools</url>
+    </scm>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <java.version>21</java.version>
+
+        <!-- DeepViolet API -->
+        <deepviolet.version>5.1.18-SNAPSHOT</deepviolet.version>
+
+        <!-- Dependencies - aligned with DeepViolet API -->
+        <jackson.databind.version>2.17.2</jackson.databind.version>
+        <logback.version>1.5.6</logback.version>
+        <commons.cli.version>1.8.0</commons.cli.version>
+
+        <!-- FlatLaf - modern L&F with macOS dark mode support -->
+        <flatlaf.version>3.7</flatlaf.version>
+
+        <!-- JSON export -->
+        <gson.version>2.11.0</gson.version>
+
+        <!-- PDF export -->
+        <openpdf.version>2.0.5</openpdf.version>
+
+        <!-- Test dependencies -->
+        <junit.jupiter.version>5.10.3</junit.jupiter.version>
+
+        <!-- Plugin versions -->
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <maven.shade.plugin.version>3.6.0</maven.shade.plugin.version>
+        <maven.surefire.plugin.version>3.3.0</maven.surefire.plugin.version>
+        <maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
+    </properties>
+
+    <dependencies>
+        <!-- DeepViolet API -->
+        <dependency>
+            <groupId>com.github.spoofzu</groupId>
+            <artifactId>DeepViolet</artifactId>
+            <version>${deepviolet.version}</version>
+        </dependency>
+
+        <!-- Jackson for JSON processing -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.9.9.1</version>
+            <version>${jackson.databind.version}</version>
         </dependency>
-        <!-- JSON pathing library -->
-        <dependency>
-            <groupId>com.jayway.jsonpath</groupId>
-            <artifactId>json-path</artifactId>
-            <version>2.4.0</version>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>2.28.2</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- 
-	<dependency><groupId>org.owasp</groupId><artifactId>security-logging-common</artifactId><version>1.1.0</version></dependency>
-    -->
-        <!-- 
-    <dependency><groupId>org.owasp</groupId><artifactId>security-logging-logback</artifactId><version>1.1.0</version></dependency>
-    -->
+
+        <!-- Logging -->
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.2.3</version>
+            <version>${logback.version}</version>
         </dependency>
+
+        <!-- Command line parsing -->
         <dependency>
             <groupId>commons-cli</groupId>
             <artifactId>commons-cli</artifactId>
-            <version>1.4</version>
+            <version>${commons.cli.version}</version>
+        </dependency>
+
+        <!-- FlatLaf - modern L&F with macOS dark mode support -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>${flatlaf.version}</version>
+        </dependency>
+
+        <!-- JSON export -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson.version}</version>
+        </dependency>
+
+        <!-- PDF export -->
+        <dependency>
+            <groupId>com.github.librepdf</groupId>
+            <artifactId>openpdf</artifactId>
+            <version>${openpdf.version}</version>
+        </dependency>
+
+        <!-- Test dependencies -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.jupiter.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
+            <!-- Compiler plugin for Java 21 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.1</version>
+                <version>${maven.compiler.plugin.version}</version>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <release>${java.version}</release>
                 </configuration>
             </plugin>
+
+            <!-- Surefire plugin for tests -->
             <plugin>
-                <!-- OneJar Notes: http://one-jar.sourceforge.net/.  OneJar lets us
-         build more than a single jar per project but no capability for
-         exclusions  -->
-                <groupId>com.jolira</groupId>
-                <artifactId>onejar-maven-plugin</artifactId>
-                <version>1.4.4</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <deepviolet.home>${project.build.directory}/test-home/DeepVioletTools</deepviolet.home>
+                        <deepviolet.global>${project.build.directory}/test-home/.deepviolet</deepviolet.global>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <!-- JAR plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven.jar.plugin.version}</version>
+            </plugin>
+
+            <!-- Shade plugin to create uber JARs -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.plugin.version}</version>
                 <executions>
+                    <!-- dvui.jar - GUI application -->
                     <execution>
-                        <id>build-first</id>
-                        <configuration>
-                            <mainClass>com.mps.deepviolettools.bin.StartUI</mainClass>
-                            <attachToBuild>true</attachToBuild>
-                            <classifier>onejar</classifier>
-                            <filename>dvUI.jar</filename>
-                        </configuration>
+                        <id>build-ui</id>
+                        <phase>package</phase>
                         <goals>
-                            <goal>one-jar</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <finalName>dvui</finalName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.mps.deepviolettools.bin.StartUI</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>com.github.spoofzu:DeepViolet</artifact>
+                                    <excludes>
+                                        <exclude>logback.xml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                        </configuration>
                     </execution>
+                    <!-- dvcli.jar - Command line application -->
                     <execution>
-                        <id>build-second</id>
-                        <configuration>
-                            <mainClass>com.mps.deepviolettools.bin.StartCMD</mainClass>
-                            <attachToBuild>true</attachToBuild>
-                            <classifier>onejar</classifier>
-                            <filename>dvCMD.jar</filename>
-                        </configuration>
+                        <id>build-cmd</id>
+                        <phase>package</phase>
                         <goals>
-                            <goal>one-jar</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <finalName>dvcli</finalName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.mps.deepviolettools.bin.StartCMD</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>com.github.spoofzu:DeepViolet</artifact>
+                                    <excludes>
+                                        <exclude>logback.xml</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

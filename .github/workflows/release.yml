@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B clean verify --file pom.xml
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DeepVioletTools ${{ steps.get_version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            target/dvui.jar
+            target/dvcli.jar
+          body: |
+            ## DeepVioletTools Release ${{ steps.get_version.outputs.VERSION }}
+
+            ### Downloads
+            - **dvui.jar** - GUI application for TLS/SSL scanning
+            - **dvcli.jar** - Command-line tool for TLS/SSL scanning
+
+            ### Requirements
+            - Java 21 or later
+
+            ### Usage
+            ```bash
+            # GUI Application
+            java -jar dvui.jar
+
+            # Command Line Tool
+            java -jar dvcli.jar -serverurl https://example.com/
+            ```
+
+            See [documentation](docs/DeepVioletTools.md) for more details.
