@@ -1,0 +1,381 @@
+{
+  "report_type": "scan",
+  "total_targets": 1,
+  "success_count": 1,
+  "error_count": 0,
+  "hosts": [
+    {
+      "target_url": "https://www.sample.com/",
+      "success": true,
+      "security_headers": {
+        "Strict-Transport-Security (HSTS)": "MISSING",
+        "Content-Security-Policy (CSP)": "MISSING",
+        "X-Content-Type-Options": "MISSING",
+        "X-Frame-Options": "SAMEORIGIN",
+        "X-XSS-Protection": "0",
+        "Referrer-Policy": "MISSING",
+        "Permissions-Policy": "MISSING"
+      },
+      "connection_properties": {
+        "REMOTE_ADDRESS": "192.0.2.1",
+        "ENABLED_PROTOCOLS": "TLSv1.3,TLSv1.2",
+        "NEGOTIATED_PROTOCOL": "TLSv1.3",
+        "NEGOTIATED_CIPHER_SUITE": "TLS_AES_256_GCM_SHA384"
+      },
+      "risk_score": {
+        "total_score": 79,
+        "letter_grade": "C",
+        "risk_level": "HIGH",
+        "categories": [
+          {
+            "category_key": "PROTOCOLS",
+            "display_name": "Protocols \u0026 Connections",
+            "score": 60,
+            "risk_level": "HIGH",
+            "summary": "2 issue(s) found",
+            "deductions": [
+              {
+                "rule_id": "SYS-0000700",
+                "description": "Secure renegotiation not supported on TLS 1.2 (renegotiation_info absent)",
+                "score": 0.7,
+                "severity": "HIGH",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0000900",
+                "description": "ALPN not negotiated",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              }
+            ]
+          },
+          {
+            "category_key": "CIPHER_SUITES",
+            "display_name": "Cipher Suites",
+            "score": 100,
+            "risk_level": "LOW",
+            "summary": "No issues found"
+          },
+          {
+            "category_key": "CERTIFICATE",
+            "display_name": "Certificate \u0026 Chain",
+            "score": 60,
+            "risk_level": "MEDIUM",
+            "summary": "1 issue(s) found",
+            "deductions": [
+              {
+                "rule_id": "SYS-0021000",
+                "description": "Certificate expires in less than 90 days",
+                "score": 0.4,
+                "severity": "MEDIUM",
+                "inconclusive": false
+              }
+            ]
+          },
+          {
+            "category_key": "REVOCATION",
+            "display_name": "Revocation \u0026 Transparency",
+            "score": 80,
+            "risk_level": "MEDIUM",
+            "summary": "2 issue(s) found",
+            "deductions": [
+              {
+                "rule_id": "SYS-0030200",
+                "description": "OCSP stapling not present",
+                "score": 0.3,
+                "severity": "MEDIUM",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0030300",
+                "description": "Must-Staple extension not present",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              }
+            ]
+          },
+          {
+            "category_key": "SECURITY_HEADERS",
+            "display_name": "Security Headers",
+            "score": 81,
+            "risk_level": "HIGH",
+            "summary": "6 issue(s) found",
+            "deductions": [
+              {
+                "rule_id": "SYS-0040100",
+                "description": "Strict-Transport-Security header missing",
+                "score": 0.6,
+                "severity": "HIGH",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0040400",
+                "description": "X-Content-Type-Options header missing",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0040600",
+                "description": "Content-Security-Policy header missing",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0040700",
+                "description": "Permissions-Policy header missing",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0040800",
+                "description": "Referrer-Policy header missing",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0040900",
+                "description": "Cross-Origin-Opener-Policy header missing",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              }
+            ]
+          },
+          {
+            "category_key": "DNS_SECURITY",
+            "display_name": "DNS Security",
+            "score": 80,
+            "risk_level": "MEDIUM",
+            "summary": "2 issue(s) found",
+            "deductions": [
+              {
+                "rule_id": "SYS-0050100",
+                "description": "No CAA records (any CA can issue certificates)",
+                "score": 0.3,
+                "severity": "MEDIUM",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "SYS-0050200",
+                "description": "No DANE/TLSA records",
+                "score": 0.1,
+                "severity": "LOW",
+                "inconclusive": false
+              }
+            ]
+          },
+          {
+            "category_key": "OTHER",
+            "display_name": "Other",
+            "score": 100,
+            "risk_level": "LOW",
+            "summary": "No issues found"
+          },
+          {
+            "category_key": "INFO",
+            "display_name": "Informational",
+            "score": 100,
+            "risk_level": "LOW",
+            "summary": "2 issue(s) found",
+            "deductions": [
+              {
+                "rule_id": "USR-0000001",
+                "description": "Certificate uses EC 256-bit key",
+                "score": 0.0,
+                "severity": "INFO",
+                "inconclusive": false
+              },
+              {
+                "rule_id": "USR-0000002",
+                "description": "Negotiated TLSv1.3 with TLS_AES_256_GCM_SHA384",
+                "score": 0.0,
+                "severity": "INFO",
+                "inconclusive": false
+              }
+            ]
+          }
+        ]
+      },
+      "ciphers": [
+        {
+          "name": "TLS_AES_128_GCM_SHA256(0x1301)",
+          "strength": "STRONG",
+          "protocol": "TLSv1.3"
+        },
+        {
+          "name": "TLS_AES_256_GCM_SHA384(0x1302)",
+          "strength": "STRONG",
+          "protocol": "TLSv1.3"
+        },
+        {
+          "name": "TLS_CHACHA20_POLY1305_SHA256(0x1303)",
+          "strength": "STRONG",
+          "protocol": "TLSv1.3"
+        }
+      ],
+      "scan_report": {
+        "report_version": "1.0",
+        "_preamble": [
+          { "type": "BLANK" },
+          { "type": "NOTICE", "text": "  Server Target https://www.sample.com/" },
+          { "type": "BLANK" }
+        ],
+        "TLS Risk Assessment": {
+          "Overall Score": "79/100",
+          "Grade": "C",
+          "Risk Level": "HIGH",
+          "Details": {
+            "_content": [
+              "Overall                       \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591  79/100",
+              "1. Protocols & Connections    \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591  60/100 [HIGH]",
+              "2. Cipher Suites              \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  100/100 [LOW]",
+              "3. Certificate & Chain        \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591  60/100 [MEDIUM]",
+              "4. Revocation & Transparency  \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591  80/100 [MEDIUM]",
+              "5. Security Headers           \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591  81/100 [HIGH]",
+              "6. DNS Security               \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591  80/100 [MEDIUM]",
+              "7. Other                      \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  100/100 [LOW]",
+              "8. Informational              \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  100/100 [LOW]",
+              "\u2588 pass   \u2590 inconclusive   \u2591 fail   (scale=20 blocks)"
+            ]
+          },
+          "1. Protocols & Connections (60/100)": {
+            "_warnings": [
+              { "text": "SYS-0000700 [HIGH] Secure renegotiation not supported on TLS 1.2 (score: 0.70)", "severity": "HIGH" },
+              { "text": "SYS-0000900 [LOW] ALPN not negotiated (score: 0.10)", "severity": "LOW" }
+            ],
+            "_content": [ "2 issue(s) found" ]
+          },
+          "3. Certificate & Chain (60/100)": {
+            "_warnings": [
+              { "text": "SYS-0021000 [MEDIUM] Certificate expires in less than 90 days (score: 0.40)", "severity": "MEDIUM" }
+            ],
+            "_content": [ "1 issue(s) found" ]
+          },
+          "4. Revocation & Transparency (80/100)": {
+            "_warnings": [
+              { "text": "SYS-0030200 [MEDIUM] OCSP stapling not present (score: 0.30)", "severity": "MEDIUM" },
+              { "text": "SYS-0030300 [LOW] Must-Staple extension not present (score: 0.10)", "severity": "LOW" }
+            ],
+            "_content": [ "2 issue(s) found" ]
+          },
+          "5. Security Headers (81/100)": {
+            "_warnings": [
+              { "text": "SYS-0040100 [HIGH] Strict-Transport-Security header missing (score: 0.60)", "severity": "HIGH" },
+              { "text": "SYS-0040400 [LOW] X-Content-Type-Options header missing (score: 0.10)", "severity": "LOW" },
+              { "text": "SYS-0040600 [LOW] Content-Security-Policy header missing (score: 0.10)", "severity": "LOW" },
+              { "text": "SYS-0040700 [LOW] Permissions-Policy header missing (score: 0.10)", "severity": "LOW" },
+              { "text": "SYS-0040800 [LOW] Referrer-Policy header missing (score: 0.10)", "severity": "LOW" },
+              { "text": "SYS-0040900 [LOW] Cross-Origin-Opener-Policy header missing (score: 0.10)", "severity": "LOW" }
+            ],
+            "_content": [ "6 issue(s) found" ]
+          },
+          "6. DNS Security (80/100)": {
+            "_warnings": [
+              { "text": "SYS-0050100 [MEDIUM] No CAA records (score: 0.30)", "severity": "MEDIUM" },
+              { "text": "SYS-0050200 [LOW] No DANE/TLSA records (score: 0.10)", "severity": "LOW" }
+            ],
+            "_content": [ "2 issue(s) found" ]
+          },
+          "8. Informational (100/100)": {
+            "_warnings": [
+              { "text": "USR-0000001 [INFO] Certificate uses EC 256-bit key (score: 0.00)", "severity": "INFO" },
+              { "text": "USR-0000002 [INFO] Negotiated TLSv1.3 with TLS_AES_256_GCM_SHA384 (score: 0.00)", "severity": "INFO" }
+            ],
+            "_content": [ "2 issue(s) found" ]
+          }
+        },
+        "Host information": {
+          "Host": "www.sample.com [192.0.2.1]",
+          "Canonical": "www.sample.com"
+        },
+        "Security headers analysis": {
+          "Strict-Transport-Security (HSTS)": "\u003e\u003e\u003eMISSING\u003c\u003c\u003c",
+          "Content-Security-Policy (CSP)": "\u003e\u003e\u003eMISSING\u003c\u003c\u003c",
+          "X-Content-Type-Options": "\u003e\u003e\u003eMISSING\u003c\u003c\u003c",
+          "X-Frame-Options": "PRESENT (SAMEORIGIN)",
+          "X-XSS-Protection": "PRESENT (0)",
+          "Referrer-Policy": "\u003e\u003e\u003eMISSING\u003c\u003c\u003c",
+          "Permissions-Policy": "\u003e\u003e\u003eMISSING\u003c\u003c\u003c"
+        },
+        "Connection characteristics": {
+          "ENABLED_PROTOCOLS": "TLSv1.3,TLSv1.2",
+          "NEGOTIATED_PROTOCOL": "TLSv1.3",
+          "NEGOTIATED_CIPHER_SUITE": "TLS_AES_256_GCM_SHA384"
+        },
+        "Server cipher suites": {
+          "TLS_AES_128_GCM_SHA256(0x1301)": "Strength=STRONG, Protocol=TLSv1.3",
+          "TLS_AES_256_GCM_SHA384(0x1302)": "Strength=STRONG, Protocol=TLSv1.3",
+          "TLS_CHACHA20_POLY1305_SHA256(0x1303)": "Strength=STRONG, Protocol=TLSv1.3"
+        },
+        "Server certificate chain": {
+          "Chain Summary (end-entity --> root)": {
+            "NODE0(End-Entity)": {
+              "SubjectDN": "CN=www.sample.com",
+              "IssuerDN": "CN=Sample CA G2, O=Sample Trust Services, C=US",
+              "Fingerprint": "SHA256withECDSA [A2:CD:00:B4:84:03:75:07]"
+            },
+            "NODE1(Intermediate CA)": {
+              "SubjectDN": "CN=Sample CA G2, O=Sample Trust Services, C=US",
+              "IssuerDN": "CN=Sample Root R4, O=Sample Trust Services LLC, C=US",
+              "Fingerprint": "SHA384withECDSA [88:06:E6:63:DB:C2:FA:92]"
+            },
+            "NODE2(Java Root CA)": {
+              "SubjectDN": "CN=Sample Root R4, O=Sample Trust Services LLC, C=US",
+              "_content": [ "(not sent by server, found in Java trust store)" ]
+            }
+          }
+        },
+        "Chain details": {
+          "NODE0(End-Entity)": {
+            "Trust State": "TRUSTED",
+            "Validity Check": "VALID",
+            "Days Until Expiration": "284",
+            "Subject DN": "CN=www.sample.com",
+            "Issuer DN": "CN=Sample CA G2, O=Sample Trust Services, C=US",
+            "Signature Algorithm": "SHA256withECDSA",
+            "Certificate Version": "3",
+            "Public Key Algorithm": "EC",
+            "Public Key Size": "256 bits",
+            "Public Key Curve": "secp256r1",
+            "SAN Count": "1"
+          },
+          "NODE1(Intermediate CA)": {
+            "Validity Check": "VALID",
+            "Days Until Expiration": "1087",
+            "Subject DN": "CN=Sample CA G2, O=Sample Trust Services, C=US",
+            "Issuer DN": "CN=Sample Root R4, O=Sample Trust Services LLC, C=US",
+            "Signature Algorithm": "SHA384withECDSA",
+            "Public Key Algorithm": "EC",
+            "Public Key Size": "256 bits",
+            "Public Key Curve": "secp256r1"
+          }
+        },
+        "Certificate revocation status": {
+          "[End-Entity] CN=www.sample.com": {
+            "OCSP Check": {
+              "Status": "GOOD"
+            },
+            "OCSP Stapling": "NOT PRESENT",
+            "Must-Staple": "NOT PRESENT",
+            "CRL Check": {
+              "Status": "GOOD"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "host_index": [
+    {
+      "index": 1,
+      "host": "www.sample.com",
+      "columns": [ 1, 20 ]
+    }
+  ]
+}

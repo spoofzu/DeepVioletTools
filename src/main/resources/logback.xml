@@ -1,28 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Minimal auto-configuration: no file appenders.
+     The full config is in logback-default.xml and loaded by LogUtils.logInit()
+     after setting the dv.log.dir system property. Without this stub, logback
+     auto-configures from logback-default.xml before the property is set,
+     creating a stray dv.log.dir_IS_UNDEFINED directory in the working dir. -->
 <configuration>
-
-  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-      <encoder>
-       <pattern>%msg%n</pattern>
-      </encoder>
-  </appender>
-  
-   <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-    <!--  ${dv_user_directory} is OS dependent and set by DeepViolet -->
-   	<file>${dv_user_directory}deepviolet.log</file>
-    <encoder>
-      <pattern>%date{ISO8601} [%thread] %-5level [%file:%line] - %msg%n</pattern>
-    </encoder>
-  </appender>
-     
-   <!-- sink logback messages for now, noisy -->
-   <logger name="ch.qos.logback" level="ERROR" additivity="false">
-   		 <appender-ref ref="FILE" />
-   </logger>
-     
-  <root level="${dv_user_level}">
-    <appender-ref ref="STDOUT" />
-    <appender-ref ref="FILE" />
-  </root>
-  
+  <root level="OFF" />
 </configuration>

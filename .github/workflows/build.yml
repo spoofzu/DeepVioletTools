@@ -1,0 +1,64 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        java-version: [ '21', '24' ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn -B clean verify --file pom.xml
+
+      - name: Upload dvui artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvui-jar-java${{ matrix.java-version }}
+          path: target/dvui.jar
+          if-no-files-found: error
+
+      - name: Upload dvcli artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dvcli-jar-java${{ matrix.java-version }}
+          path: target/dvcli.jar
+          if-no-files-found: error
+
+  # Optional: Run a quick smoke test
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Download dvcli artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dvcli-jar-java21
+
+      - name: Run help command
+        run: java -jar dvcli.jar -h

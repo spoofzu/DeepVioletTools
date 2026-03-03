@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+body { margin: 12px; background-color: {{BODY_BG}}; color: {{BODY_FG}}; font-family: '{{FONT_FAMILY}}', sans-serif; font-size: {{FONT_SIZE}}pt; }
+h2 { border-bottom: 1px solid {{BORDER_COLOR}}; padding-bottom: 4px; margin-top: 20px; }
+h3 { margin-top: 14px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+th, td { border: 1px solid {{BORDER_COLOR}}; padding: 5px 8px; text-align: left; }
+th { background-color: {{TH_BG}}; }
+code { background-color: {{CODE_BG}}; padding: 1px 4px; }
+a { color: {{LINK_COLOR}}; }
+</style>
+</head>
+<body>
+
+<h1>DeepViolet Interface Help</h1>
+<p>This guide explains how to use the DeepViolet interface and how to read
+and interpret scan reports. Each section of a scan report is documented below
+with explanations of the terminology, values, and warning messages you may encounter.</p>
+
+<h2>1. How to Read a Report</h2>
+<p>A DeepViolet scan report is organized into sections, each enclosed in
+<code>[Section Name]</code> brackets. Sections appear in the order they are
+enabled in <b>File &gt; Settings &gt; Engine</b>.</p>
+<p><b>Color coding:</b> The results pane uses syntax highlighting to
+distinguish different types of information:</p>
+<ul>
+<li><b>Section headings</b> appear in the heading color</li>
+<li><b>Subsection labels</b> appear bold in the subsection color</li>
+<li><b>Key=Value pairs</b> show keys and values in distinct colors</li>
+<li><b>Warnings</b> are highlighted in the warning color</li>
+</ul>
+<p><b>Warning markers:</b> Issues requiring attention are wrapped in
+<code>&gt;&gt;&gt;...&lt;&lt;&lt;</code> markers. For example,
+<code>&gt;&gt;&gt;MISSING&lt;&lt;&lt;</code> indicates a missing security header,
+and <code>&gt;&gt;&gt;UNTRUSTED&lt;&lt;&lt;</code> flags an untrusted certificate.</p>
+
+<h2>2. Saving and Exporting Reports</h2>
+<p>Click <b>Save</b> to export the current scan results. A file chooser dialog
+opens with a format selector panel on the right side. Supported formats:</p>
+<table>
+<tr><th>Format</th><th>Extension</th><th>Description</th></tr>
+<tr><td>ASCII Text</td><td>.txt</td><td>Plain text report</td></tr>
+<tr><td>Rich Text</td><td>.rtf</td><td>RTF with syntax highlighting from the results pane</td></tr>
+<tr><td>HTML</td><td>.html</td><td>Themed HTML using Reporting tab colors</td></tr>
+<tr><td>PDF</td><td>.pdf</td><td>Themed PDF document using Reporting tab colors</td></tr>
+<tr><td>JSON</td><td>.json</td><td>Structured JSON for programmatic consumption</td></tr>
+</table>
+<p>The last-used format and folder are remembered between sessions.</p>
+<p>Scan results are also <b>auto-saved</b> as text files to
+<code>~/DeepVioletTools/ui/scans/</code> each time a scan completes.
+These auto-saved files are available for review in the AI Assistant tab.</p>
+
+<h2>3. Multi-Target Scanning</h2>
+<p>The <b>Scan</b> tab lets you scan multiple targets in one operation and
+compare results across hosts using heat map visualizations.</p>
+
+<h3>Entering Targets</h3>
+<p>Enter one target per line in the targets text area. Supported formats:</p>
+<table>
+<tr><th>Format</th><th>Example</th><th>Description</th></tr>
+<tr><td>IPv4 address</td><td><code>192.168.1.1</code></td><td>Single IPv4 address on port 443</td></tr>
+<tr><td>IPv4 with port</td><td><code>10.0.1.5:8443</code></td><td>Single IPv4 address on a custom port</td></tr>
+<tr><td>IPv6 bracketed</td><td><code>[2001:db8::1]</code></td><td>IPv6 address on port 443</td></tr>
+<tr><td>IPv6 with port</td><td><code>[::1]:8443</code></td><td>IPv6 address on a custom port</td></tr>
+<tr><td>IPv6 bare</td><td><code>2001:db8::1</code></td><td>Bare IPv6 address (auto-bracketed)</td></tr>
+<tr><td>Dash range</td><td><code>10.0.2.1-50</code></td><td>IPv4 last-octet range; expands to 10.0.2.1 through 10.0.2.50</td></tr>
+<tr><td>Hostname</td><td><code>example.com</code></td><td>Bare hostname on port 443</td></tr>
+<tr><td>Hostname with port</td><td><code>example.com:8443</code></td><td>Hostname on a custom port</td></tr>
+<tr><td>Full URL</td><td><code>https://www.example.com/</code></td><td>Used as-is</td></tr>
+<tr><td>IPv4 CIDR block</td><td><code>10.0.0.0/24</code></td><td>Expands to all host addresses in the block</td></tr>
+<tr><td>IPv6 CIDR block</td><td><code>2001:db8::/120</code></td><td>Expands IPv6 addresses (capped at configurable limit)</td></tr>
+</table>
+<p>You can also click <b>Load File</b> to import targets from a text or CSV file
+(lines starting with <code>#</code> are treated as comments).</p>
+
+<h3>Heat Map Results</h3>
+<p>After a scan completes, results are displayed in four heat map tabs:</p>
+<ul>
+<li><b>Risk</b> &mdash; overall TLS risk assessment scores across hosts</li>
+<li><b>Ciphers</b> &mdash; cipher suite support across hosts</li>
+<li><b>Connection</b> &mdash; connection properties across hosts</li>
+<li><b>Fingerprint</b> &mdash; TLS fingerprint components across hosts</li>
+</ul>
+<p>Cell colors indicate pass (green), fail (red), or mixed results.
+The <b>Host Details</b> tab shows the full individual report for any host in the scan.</p>
+
+<h3>Status Bar</h3>
+<p>During a scan, the status bar at the bottom shows the current worker activity,
+for example: <code>worker 1: TLS risk assessment</code>. When multiple workers run in
+parallel, they are separated by pipes:
+<code>worker 1: TLS risk assessment | worker 2: Security headers</code>.</p>
+
+<h3>Saving Results</h3>
+<p>Scan results are <b>auto-saved</b> to <code>~/DeepVioletTools/ui/scans/</code>
+when a scan completes. You can also click <b>Save</b> to export in Text, HTML, PDF, or JSON format.</p>
+
+<h3>CIDR Reference</h3>
+<p>CIDR (Classless Inter-Domain Routing) notation specifies an IP address range using
+a prefix length. The prefix length determines how many bits are fixed (network) and how
+many vary (host addresses). Both IPv4 (/0&ndash;/32) and IPv6 (/0&ndash;/128) CIDR notation
+are supported. IPv6 CIDR expansion is capped at a configurable maximum (default 4,096 addresses)
+since IPv6 subnets can contain astronomically large address spaces.</p>
+
+<table>
+<tr><th>CIDR</th><th>Binary Mask</th><th>Subnet Mask</th><th>Host IPs</th></tr>
+<tr><td>/0</td><td>00000000.00000000.00000000.00000000</td><td>0.0.0.0</td><td>4,294,967,294</td></tr>
+<tr><td>/1</td><td>10000000.00000000.00000000.00000000</td><td>128.0.0.0</td><td>2,147,483,646</td></tr>
+<tr><td>/2</td><td>11000000.00000000.00000000.00000000</td><td>192.0.0.0</td><td>1,073,741,822</td></tr>
+<tr><td>/3</td><td>11100000.00000000.00000000.00000000</td><td>224.0.0.0</td><td>536,870,910</td></tr>
+<tr><td>/4</td><td>11110000.00000000.00000000.00000000</td><td>240.0.0.0</td><td>268,435,454</td></tr>
+<tr><td>/5</td><td>11111000.00000000.00000000.00000000</td><td>248.0.0.0</td><td>134,217,726</td></tr>
+<tr><td>/6</td><td>11111100.00000000.00000000.00000000</td><td>252.0.0.0</td><td>67,108,862</td></tr>
+<tr><td>/7</td><td>11111110.00000000.00000000.00000000</td><td>254.0.0.0</td><td>33,554,430</td></tr>
+<tr><td>/8</td><td>11111111.00000000.00000000.00000000</td><td>255.0.0.0</td><td>16,777,214</td></tr>
+<tr><td>/9</td><td>11111111.10000000.00000000.00000000</td><td>255.128.0.0</td><td>8,388,606</td></tr>
+<tr><td>/10</td><td>11111111.11000000.00000000.00000000</td><td>255.192.0.0</td><td>4,194,302</td></tr>
+<tr><td>/11</td><td>11111111.11100000.00000000.00000000</td><td>255.224.0.0</td><td>2,097,150</td></tr>
+<tr><td>/12</td><td>11111111.11110000.00000000.00000000</td><td>255.240.0.0</td><td>1,048,574</td></tr>
+<tr><td>/13</td><td>11111111.11111000.00000000.00000000</td><td>255.248.0.0</td><td>524,286</td></tr>
+<tr><td>/14</td><td>11111111.11111100.00000000.00000000</td><td>255.252.0.0</td><td>262,142</td></tr>
+<tr><td>/15</td><td>11111111.11111110.00000000.00000000</td><td>255.254.0.0</td><td>131,070</td></tr>
+<tr><td>/16</td><td>11111111.11111111.00000000.00000000</td><td>255.255.0.0</td><td>65,534</td></tr>
+<tr><td>/17</td><td>11111111.11111111.10000000.00000000</td><td>255.255.128.0</td><td>32,766</td></tr>
+<tr><td>/18</td><td>11111111.11111111.11000000.00000000</td><td>255.255.192.0</td><td>16,382</td></tr>
+<tr><td>/19</td><td>11111111.11111111.11100000.00000000</td><td>255.255.224.0</td><td>8,190</td></tr>
+<tr><td>/20</td><td>11111111.11111111.11110000.00000000</td><td>255.255.240.0</td><td>4,094</td></tr>
+<tr><td>/21</td><td>11111111.11111111.11111000.00000000</td><td>255.255.248.0</td><td>2,046</td></tr>
+<tr><td>/22</td><td>11111111.11111111.11111100.00000000</td><td>255.255.252.0</td><td>1,022</td></tr>
+<tr><td>/23</td><td>11111111.11111111.11111110.00000000</td><td>255.255.254.0</td><td>510</td></tr>
+<tr><td>/24</td><td>11111111.11111111.11111111.00000000</td><td>255.255.255.0</td><td>254</td></tr>
+<tr><td>/25</td><td>11111111.11111111.11111111.10000000</td><td>255.255.255.128</td><td>126</td></tr>
+<tr><td>/26</td><td>11111111.11111111.11111111.11000000</td><td>255.255.255.192</td><td>62</td></tr>
+<tr><td>/27</td><td>11111111.11111111.11111111.11100000</td><td>255.255.255.224</td><td>30</td></tr>
+<tr><td>/28</td><td>11111111.11111111.11111111.11110000</td><td>255.255.255.240</td><td>14</td></tr>
+<tr><td>/29</td><td>11111111.11111111.11111111.11111000</td><td>255.255.255.248</td><td>6</td></tr>
+<tr><td>/30</td><td>11111111.11111111.11111111.11111100</td><td>255.255.255.252</td><td>2</td></tr>
+<tr><td>/31</td><td>11111111.11111111.11111111.11111110</td><td>255.255.255.254</td><td>2 (point-to-point)</td></tr>
+<tr><td>/32</td><td>11111111.11111111.11111111.11111111</td><td>255.255.255.255</td><td>1 (single host)</td></tr>
+</table>
+
+<h3>Special IP Addresses</h3>
+<p>The following IPv4 address blocks are reserved for special purposes and are
+not routable on the public Internet.</p>
+<table>
+<tr><th>Block</th><th>CIDR</th><th>Total Reserved IPs</th></tr>
+<tr><td>Private (RFC 1918)</td><td>10/8 + 172.16/12 + 192.168/16</td><td>17,891,328</td></tr>
+<tr><td>Loopback</td><td>127/8</td><td>16,777,216</td></tr>
+<tr><td>Link-Local</td><td>169.254/16</td><td>65,536</td></tr>
+<tr><td>Carrier-Grade NAT</td><td>100.64/10</td><td>4,194,304</td></tr>
+<tr><td>Multicast</td><td>224/4</td><td>268,435,456</td></tr>
+<tr><td>Class E Reserved</td><td>240/4</td><td>268,435,456</td></tr>
+<tr><td>Documentation</td><td>3 &times; /24</td><td>768</td></tr>
+<tr><td>Benchmarking</td><td>198.18/15</td><td>131,072</td></tr>
+<tr><td>This Network</td><td>0/8</td><td>16,777,216</td></tr>
+<tr><td>Broadcast</td><td>255.255.255.255/32</td><td>1</td></tr>
+<tr><td colspan='2'><b>Total</b></td><td><b>~592,717,353 IPs (~13.8% of all IPv4 space)</b></td></tr>
+</table>
+
+<h3>IPv6 Special Addresses</h3>
+<p>The following IPv6 address blocks are reserved for special purposes.</p>
+<table>
+<tr><th>Block</th><th>CIDR</th><th>Description</th></tr>
+<tr><td>Loopback</td><td>::1/128</td><td>Loopback address (equivalent to IPv4 127.0.0.1)</td></tr>
+<tr><td>Link-Local</td><td>fe80::/10</td><td>Link-local unicast (auto-configured)</td></tr>
+<tr><td>Unique Local</td><td>fc00::/7</td><td>Private addresses (similar to IPv4 RFC 1918)</td></tr>
+<tr><td>Documentation</td><td>2001:db8::/32</td><td>Reserved for documentation and examples</td></tr>
+<tr><td>6to4</td><td>2002::/16</td><td>6to4 transition mechanism</td></tr>
+<tr><td>Multicast</td><td>ff00::/8</td><td>IPv6 multicast</td></tr>
+<tr><td>Global Unicast</td><td>2000::/3</td><td>Routable Internet addresses</td></tr>
+</table>
+
+<h3>IPv6 Notes</h3>
+<ul>
+<li><b>Dash ranges</b> are IPv4-only. IPv6 dash ranges are not supported.</li>
+<li><b>Bare IPv6 addresses</b> (e.g., <code>2001:db8::1</code>) are automatically
+wrapped in brackets when constructing URLs.</li>
+<li><b>Bracketed notation</b> (e.g., <code>[::1]:8443</code>) follows RFC 3986
+and is the preferred format for specifying IPv6 with a port.</li>
+</ul>
+
+<h2>4. AI Assistant</h2>
+<p>The <b>AI Assistant</b> tab provides a terminal-style chat interface for asking
+questions about scan results. To use it:</p>
+<ol>
+<li>Enable AI in <b>File &gt; Settings &gt; AI &gt; Configuration</b> and configure a provider</li>
+<li>Switch to the <b>AI Assistant</b> tab</li>
+<li>Choose a <b>Scan Type</b> using the radio buttons: <b>Individual</b> for single-host scans or <b>Multi-Target</b> for multi-target scans</li>
+<li>Select a scan from the scan selector dropdown (shows saved scans of the selected type)</li>
+<li>Type a question in the text field and click <b>Send</b> (or press Enter)</li>
+</ol>
+<p>The AI receives the selected scan report as context and can answer questions about
+the server's TLS configuration, certificate details, security headers, vulnerabilities,
+and remediation steps. Chat history is maintained within each scan context so follow-up questions
+understand previous context. Selecting a different scan from the dropdown resets the chat history.</p>
+
+<h3>Supported Providers</h3>
+<table>
+<tr><th>Provider</th><th>API Key</th><th>Notes</th></tr>
+<tr><td>Anthropic</td><td>Required</td><td>Cloud-hosted Claude models</td></tr>
+<tr><td>OpenAI</td><td>Required</td><td>Cloud-hosted GPT models</td></tr>
+<tr><td>Ollama</td><td>Not required</td><td>Local models; configure the endpoint URL in Settings</td></tr>
+</table>
+<p>API keys are encrypted with AES-GCM before being stored locally.
+Chat history is logged to <code>~/DeepVioletTools/ui/aichat.log</code>.</p>
+
+<h3>Terminal Colors</h3>
+<p>The AI terminal appearance can be customized in <b>File &gt; Settings &gt; AI &gt; Terminal Colors</b>.
+Nine color controls are available for background, system text, user prefix/text,
+AI prefix/text, error text, and selection colors.</p>
+
+<h2>5. Card Layout Editor</h2>
+<p>The <b>Cards</b> sub-tab in <b>File &gt; Settings &gt; Reporting</b> lets you
+customize the appearance of host cards used in scan results.</p>
+
+<h3>Grid Editor</h3>
+<p>The card layout editor displays a configurable grid. Metadata elements from the
+palette on the left can be placed into grid cells. Elements appear as colored tiles
+showing their name and a small alignment dot.</p>
+
+<h3>Interactions</h3>
+<table>
+<tr><th>Gesture</th><th>Action</th></tr>
+<tr><td>Drag from palette to grid</td><td>Place an element into a cell</td></tr>
+<tr><td>Shift+click on element</td><td>Adjust alignment within the cell (3&times;3 regions: left/center/right &times; top/center/bottom)</td></tr>
+<tr><td>Drag an element within grid</td><td>Extend element to span multiple columns and/or rows</td></tr>
+<tr><td>Right-click on element</td><td>Context menu: &ldquo;Remove from card&rdquo; or &ldquo;Reset span to 1&times;1&rdquo;</td></tr>
+<tr><td>Drag a grid line</td><td>Resize cell proportions (cursor changes to resize arrow near interior lines)</td></tr>
+</table>
+
+<h3>Controls</h3>
+<ul>
+<li><b>Cols / Rows spinners</b> &mdash; Set grid dimensions (1&ndash;5 columns, 2&ndash;9 rows)</li>
+<li><b>Reset button</b> (circular arrow) &mdash; Restore the default 3&times;5 layout</li>
+<li><b>Trash</b> (trash can icon) &mdash; Drag elements here to remove them from the card</li>
+</ul>
+
+<h3>Multi-Cell Spanning</h3>
+<p>Elements can span multiple columns and/or rows. Click on a placed element and drag
+within the grid to extend it. For example, Risk Bars can span all 3 columns to stretch
+the full card width. The span is clamped at grid boundaries and will not overlap other
+elements. Right-click an element and choose &ldquo;Reset span to 1&times;1&rdquo; to
+return it to a single cell.</p>
+
+<h3>Card Preview</h3>
+<p>Below the grid editor, a live card preview shows how the card will look with sample
+data. The preview updates in real time as you edit the layout, adjust alignment,
+resize cell proportions, or change card font and color settings.</p>
+
+<h2>6. Custom Overlays</h2>
+<p>DeepViolet supports two custom overlay features that let you extend or replace
+built-in data with your own YAML definitions. Both are configured in <b>File &gt; Settings</b>.</p>
+
+<h3>Custom Cipher Map</h3>
+<p>The <b>Cipher Map</b> settings tab lets you replace the built-in cipher suite map
+with a custom YAML definition. When enabled, cipher suite strength ratings in scan
+reports reflect your custom map instead of the defaults.</p>
+<ul>
+<li><b>Enable</b> &mdash; check "Enable custom cipher map" to activate</li>
+<li><b>Edit</b> &mdash; paste or type YAML directly in the text area</li>
+<li><b>Load File</b> &mdash; import a <code>.yaml</code> or <code>.yml</code> file</li>
+<li><b>Save to File</b> &mdash; export the current YAML to a file</li>
+<li><b>Clear</b> &mdash; remove the custom map and revert to defaults</li>
+</ul>
+<p>The YAML format uses a <code>cipher_suites</code> array with <code>id</code>,
+<code>names</code> (IANA, OpenSSL, etc.), <code>strength</code> (STRONG, MEDIUM, WEAK, CLEAR),
+and <code>tls_versions</code> fields. See the placeholder text in the settings tab for an example.</p>
+<p><b>CLI:</b> Use <code>--ciphermap &lt;path&gt;</code> to load a custom cipher map
+from a YAML file. The CLI flag overrides the saved GUI preference.</p>
+
+<h3>User Risk Rules</h3>
+<p>The <b>User Risks</b> settings tab lets you define custom risk assessment rules
+that are merged with the built-in system rules during scoring. Custom rules use
+<code>USR-</code> prefixed IDs and appear alongside system findings in the risk assessment.</p>
+<ul>
+<li><b>Enable</b> &mdash; check "Enable user risk rules" to activate</li>
+<li><b>Edit</b> &mdash; paste or type YAML directly in the text area</li>
+<li><b>Load File</b> &mdash; import a <code>.yaml</code> or <code>.yml</code> file</li>
+<li><b>Save to File</b> &mdash; export the current YAML to a file</li>
+<li><b>Clear</b> &mdash; remove user rules (only system rules will apply)</li>
+</ul>
+<p>The YAML format uses a <code>categories</code> map with rule definitions containing
+<code>id</code>, <code>description</code>, <code>score</code>, <code>when</code>, and
+<code>enabled</code> fields. See the placeholder text in the settings tab for an example.</p>
+<p><b>CLI:</b> Use <code>--riskrules &lt;path&gt;</code> to load user risk rules
+from a YAML file. The CLI flag overrides the saved GUI preference.</p>
+
+<h2>7. Report Header</h2>
+<p>The header section provides context about the scan environment:</p>
+<ul>
+<li><b>DeepViolet version</b> and report timestamp</li>
+<li><b>Java version</b> &mdash; the JVM running the scan, which determines available TLS capabilities</li>
+<li><b>Trust store</b> &mdash; the file path of the Java trust store (cacerts) used to verify certificate chains</li>
+<li><b>Log file</b> &mdash; location of the detailed scan log for troubleshooting</li>
+</ul>
+
+<h2>8. TLS Risk Assessment</h2>
+<p>The risk assessment provides an overall security evaluation of the target server.</p>
+
+<h3>Scoring</h3>
+<p>The <b>Overall Score</b> is calculated out of 115 points. Points are deducted
+for security weaknesses found during the scan. The score maps to a letter grade:</p>
+<table>
+<tr><th>Grade</th><th>Score Range</th><th>Risk Level</th></tr>
+<tr><td>A+</td><td>100%</td><td>MINIMAL</td></tr>
+<tr><td>A</td><td>90&ndash;99%</td><td>LOW</td></tr>
+<tr><td>B</td><td>80&ndash;89%</td><td>MODERATE</td></tr>
+<tr><td>C</td><td>70&ndash;79%</td><td>ELEVATED</td></tr>
+<tr><td>D</td><td>60&ndash;69%</td><td>HIGH</td></tr>
+<tr><td>F</td><td>&lt;60%</td><td>CRITICAL</td></tr>
+</table>
+
+<h3>Category Graph</h3>
+<p>The bar chart shows per-category scores using colored blocks:</p>
+<ul>
+<li><b>Pass blocks</b> (green) &mdash; points earned</li>
+<li><b>Inconclusive blocks</b> (amber) &mdash; could not be determined</li>
+<li><b>Fail blocks</b> (red) &mdash; points deducted</li>
+</ul>
+<p>The scale (blocks per bar) is configurable in <b>File &gt; Settings &gt; Reporting &gt; Report Colors &gt; TLS Risk Assessment &gt; Scale</b>.</p>
+
+<h3>Deductions</h3>
+<p>Below each category, individual deductions are listed with severity levels:</p>
+<ul>
+<li><b>LOW</b> &mdash; minor issue, small point deduction</li>
+<li><b>MEDIUM</b> &mdash; notable weakness</li>
+<li><b>HIGH</b> &mdash; significant vulnerability</li>
+<li><b>CRITICAL</b> &mdash; severe security issue</li>
+</ul>
+
+<h3>Other &amp; SAN Disclosure</h3>
+<p>The <b>Other</b> category (20 points) checks for miscellaneous issues including
+TLS compression, client authentication, fingerprint availability, and SAN (Subject
+Alternative Name) information disclosure. Certificates covering many SANs reveal an
+organization's hosted services, staging servers, and internal naming conventions,
+increasing the visible attack surface.</p>
+<table>
+<tr><th>SANs</th><th>Severity</th><th>Deduction</th></tr>
+<tr><td>2&ndash;5</td><td>LOW</td><td>3 pts</td></tr>
+<tr><td>6&ndash;20</td><td>MEDIUM</td><td>8 pts</td></tr>
+<tr><td>21+</td><td>HIGH</td><td>15 pts</td></tr>
+</table>
+
+<h2>9. AI Evaluation</h2>
+<p>When AI is enabled (<b>File &gt; Settings &gt; AI</b>), the report can include
+an AI-powered analysis section after the risk assessment. The scan report generated
+so far is sent to the configured AI provider, which returns a structured analysis.</p>
+<p>The AI evaluation typically includes:</p>
+<ul>
+<li><b>Executive Summary</b> &mdash; overall TLS security posture assessment</li>
+<li><b>Per-Finding Analysis</b> &mdash; for each risk assessment item: what it is, why it matters, and remediation</li>
+<li><b>Positive Findings</b> &mdash; security measures that are properly configured</li>
+<li><b>Recommendations</b> &mdash; prioritized action items</li>
+</ul>
+<p>The system prompt that controls the analysis can be customized in
+<b>File &gt; Settings &gt; AI &gt; Prompts &gt; Report System Prompt</b>.
+Lines prefixed with "CRITICAL:" or "WARNING:" are highlighted as warnings in the report.</p>
+<p>If the AI provider is unreachable or returns an error, the section shows a
+warning message with the failure reason.</p>
+
+<h2>10. Host Information</h2>
+<p>This section shows DNS resolution details for the target:</p>
+<ul>
+<li><b>Hostname</b> &mdash; the name you entered</li>
+<li><b>IP address</b> &mdash; the resolved IPv4 or IPv6 address</li>
+<li><b>Canonical name</b> &mdash; the canonical hostname returned by DNS (may differ if the host is a CNAME alias)</li>
+</ul>
+
+<h2>11. HTTP Response Headers</h2>
+<p>Raw HTTP response headers returned by the server. These headers control
+browser behavior, caching, content negotiation, and more. They are listed as
+key=value pairs exactly as received from the server.</p>
+<p>This section provides the raw data; for security-specific analysis, see the
+<b>Security Headers Analysis</b> section below.</p>
+
+<h2>12. Security Headers Analysis</h2>
+<p>Checks for the presence and values of security-critical HTTP response headers.
+Headers marked <code>&gt;&gt;&gt;MISSING&lt;&lt;&lt;</code> are not present and should be configured.</p>
+<table>
+<tr><th>Header</th><th>Purpose</th></tr>
+<tr><td>Strict-Transport-Security (HSTS)</td><td>Tells browsers to only connect via HTTPS, preventing protocol downgrade attacks.</td></tr>
+<tr><td>Content-Security-Policy (CSP)</td><td>Controls which resources the browser may load, mitigating XSS and injection attacks.</td></tr>
+<tr><td>X-Content-Type-Options</td><td>Prevents MIME type sniffing. Should be set to <code>nosniff</code>.</td></tr>
+<tr><td>X-Frame-Options</td><td>Controls whether the page can be embedded in iframes, preventing clickjacking.</td></tr>
+<tr><td>X-XSS-Protection</td><td>Legacy XSS filter (modern browsers use CSP instead). Recommended: <code>0</code> when CSP is present.</td></tr>
+<tr><td>Referrer-Policy</td><td>Controls how much referrer information is sent with requests.</td></tr>
+<tr><td>Permissions-Policy</td><td>Controls which browser features (camera, microphone, geolocation, etc.) the page may use.</td></tr>
+</table>
+
+<h2>13. Connection Characteristics</h2>
+<p>TLS session properties and socket configuration details for the connection,
+including protocol versions, keepalive settings, buffer sizes, and TCP nodelay.
+These reflect how the underlying Java TLS socket is configured for the scan.</p>
+
+<h2>14. Cipher Suites</h2>
+<p>A cipher suite defines the set of cryptographic algorithms used for a TLS connection:
+key exchange, authentication, encryption, and message authentication. This section lists
+all cipher suites the server is willing to negotiate.</p>
+
+<h3>Strength Ratings</h3>
+<table>
+<tr><th>Rating</th><th>Meaning</th></tr>
+<tr><td>STRONG</td><td>Modern, secure cipher (e.g., AES-256-GCM, ChaCha20-Poly1305)</td></tr>
+<tr><td>MEDIUM</td><td>Acceptable but not ideal (e.g., AES-128)</td></tr>
+<tr><td>WEAK</td><td>Should be disabled (e.g., 3DES, RC4)</td></tr>
+<tr><td>CLEAR</td><td>No encryption (plaintext) &mdash; never acceptable</td></tr>
+</table>
+
+<h3>Naming Conventions</h3>
+<p>Cipher suite names vary by library. DeepViolet supports four naming conventions,
+configurable in <b>File &gt; Settings &gt; Engine &gt; Cipher Suite Naming</b>:</p>
+<ul>
+<li><b>IANA</b> &mdash; standard names (default, e.g., TLS_AES_256_GCM_SHA384)</li>
+<li><b>OpenSSL</b> &mdash; OpenSSL names (e.g., AES256-GCM-SHA384)</li>
+<li><b>GnuTLS</b> &mdash; GnuTLS names</li>
+<li><b>NSS</b> &mdash; Mozilla NSS names</li>
+</ul>
+<p>Servers supporting only WEAK or CLEAR ciphers are at significant risk.
+Best practice: enable only STRONG ciphers and disable all others.</p>
+
+<h2>15. Certificate Chain</h2>
+<p>TLS servers present a certificate chain for identity verification. The chain
+typically includes:</p>
+<ol>
+<li><b>End-Entity certificate</b> &mdash; the server's own certificate</li>
+<li><b>Intermediate CA(s)</b> &mdash; certificates linking the end-entity to a trusted root</li>
+<li><b>Root CA</b> &mdash; a trusted certificate authority in the Java trust store</li>
+</ol>
+
+<h3>Trust States</h3>
+<table>
+<tr><th>State</th><th>Meaning</th></tr>
+<tr><td>TRUSTED</td><td>Chain verified against the Java trust store</td></tr>
+<tr><td><code>&gt;&gt;&gt;UNTRUSTED&lt;&lt;&lt;</code></td><td>Chain could not be verified (self-signed, unknown CA, or missing intermediates)</td></tr>
+<tr><td><code>&gt;&gt;&gt;UNKNOWN&lt;&lt;&lt;</code></td><td>Trust state could not be determined</td></tr>
+</table>
+
+<h3>Validity States</h3>
+<table>
+<tr><th>State</th><th>Meaning</th></tr>
+<tr><td>VALID</td><td>Certificate is within its validity period</td></tr>
+<tr><td><code>&gt;&gt;&gt;EXPIRED&lt;&lt;&lt;</code></td><td>Certificate validity period has ended</td></tr>
+<tr><td><code>&gt;&gt;&gt;NOT YET VALID&lt;&lt;&lt;</code></td><td>Certificate's Not Before date is in the future</td></tr>
+</table>
+
+<h3>Expiration Warnings</h3>
+<p>Certificates expiring within 30 days generate a warning. Expired certificates
+show the number of days since expiration.</p>
+
+<h3>Key Algorithms and Sizes</h3>
+<p>The report shows the public key algorithm (RSA, EC), key size in bits,
+and for ECC certificates, the named curve (e.g., secp256r1). Larger keys generally
+provide stronger security but slower handshakes.</p>
+
+<h2>16. Revocation Status</h2>
+<p>Certificate revocation checking verifies that certificates have not been
+invalidated by their issuing CA. DeepViolet checks multiple revocation mechanisms:</p>
+
+<h3>OCSP (Online Certificate Status Protocol)</h3>
+<p>Real-time revocation check against the CA's OCSP responder. The report shows
+the responder URL, status (GOOD, REVOKED, UNKNOWN), response time, and signature validation.
+"Unauthorized" errors are common for intermediate/root CA certificates and are usually normal.</p>
+
+<h3>OCSP Stapling</h3>
+<p>The server pre-fetches its OCSP response and includes it in the TLS handshake.
+This is faster and more privacy-friendly than clients querying the OCSP responder directly.
+Look for <b>PRESENT</b> (good) or <b>NOT PRESENT</b> (consider enabling on the server).</p>
+
+<h3>Must-Staple</h3>
+<p>An extension (RFC 7633) that tells browsers to require OCSP stapling. If a certificate
+has Must-Staple set but the server does not provide a stapled response, browsers will reject
+the connection. A warning is shown when this mismatch is detected.</p>
+
+<h3>CRL (Certificate Revocation List)</h3>
+<p>A list of revoked certificate serial numbers published by the CA. The report shows
+the CRL distribution point URL, download time, and CRL size.</p>
+
+<h3>OneCRL</h3>
+<p>Mozilla's centralized revocation list for high-priority certificate revocations.
+A certificate found in OneCRL has been explicitly blocked by Mozilla.</p>
+
+<h3>Certificate Transparency (SCTs)</h3>
+<p>Certificate Transparency is a system of public logs that record all issued certificates.
+Signed Certificate Timestamps (SCTs) prove a certificate was submitted to a CT log.</p>
+<p>The report shows:</p>
+<ul>
+<li><b>Embedded SCT count</b> &mdash; SCTs embedded in the certificate itself</li>
+<li><b>TLS Extension SCTs</b> &mdash; SCTs delivered via TLS extension</li>
+<li><b>OCSP Staple SCTs</b> &mdash; SCTs delivered via stapled OCSP response</li>
+<li><b>CT log identity</b> &mdash; operator, URL, and log state (usable, retired, rejected)</li>
+<li><b>SCT signature verification</b> &mdash; VALID, INVALID, or UNKNOWN_LOG</li>
+</ul>
+<p>An <code>&gt;&gt;&gt;INVALID&lt;&lt;&lt;</code> signature is a serious finding that
+may indicate a forged or corrupted SCT.</p>
+
+<h2>17. TLS Server Fingerprint</h2>
+<p>The fingerprint characterizes a server's TLS implementation by sending 10 different
+probe handshakes and hashing the combined results.</p>
+
+<h3>Probes</h3>
+<p>The 10 probes test different TLS configurations: standard and reversed cipher order,
+ALPN negotiation, non-ECC suites, different protocol versions (TLS 1.1, 1.2, 1.3),
+and forward secrecy support. Each probe result is either <b>OK</b> (handshake succeeded)
+or <b>FAIL</b> (did not complete).</p>
+
+<h3>Use Cases</h3>
+<ul>
+<li><b>Server grouping</b> &mdash; servers with the same fingerprint likely run the same TLS stack</li>
+<li><b>CDN detection</b> &mdash; identify servers behind the same CDN or load balancer</li>
+<li><b>Change tracking</b> &mdash; detect when a server's TLS configuration changes over time</li>
+</ul>
+<p>The fingerprint is displayed as colon-delimited hex octets. An <b>Extension Hash</b>
+provides additional characterization based on TLS extensions offered by the server.</p>
+
+<h2>18. Common Errors</h2>
+<p>The following table lists warning messages that may appear in reports, their causes,
+and recommended actions.</p>
+
+<h3>Certificate Errors</h3>
+<table>
+<tr><th>Message</th><th>Cause</th><th>Action</th></tr>
+<tr><td><code>&gt;&gt;&gt;EXPIRED&lt;&lt;&lt;</code></td><td>Certificate validity period has ended</td><td>Renew the certificate immediately</td></tr>
+<tr><td><code>&gt;&gt;&gt;NOT YET VALID&lt;&lt;&lt;</code></td><td>Certificate Not Before date is in the future</td><td>Check server clock and certificate dates</td></tr>
+<tr><td><code>&gt;&gt;&gt;UNTRUSTED&lt;&lt;&lt;</code></td><td>Chain could not be verified</td><td>Check for self-signed certs or missing intermediates</td></tr>
+<tr><td><code>&gt;&gt;&gt;REVOKED&lt;&lt;&lt;</code></td><td>Certificate revoked by its CA</td><td>Stop using the certificate; obtain a new one</td></tr>
+</table>
+
+<h3>OCSP Errors</h3>
+<table>
+<tr><th>Message</th><th>Cause</th><th>Action</th></tr>
+<tr><td>Unauthorized request</td><td>OCSP responder refused the request</td><td>Often normal for intermediate/root CAs; retry later if it affects the end-entity cert</td></tr>
+<tr><td>Responder unreachable</td><td>Cannot contact the OCSP URL</td><td>Check network connectivity and firewall rules</td></tr>
+<tr><td>Invalid response</td><td>Malformed OCSP response</td><td>May indicate a misconfigured CA responder</td></tr>
+</table>
+
+<h3>CT / SCT Errors</h3>
+<table>
+<tr><th>Message</th><th>Cause</th><th>Action</th></tr>
+<tr><td>CT log is retired</td><td>The log is no longer accepting submissions</td><td>Existing SCTs are still valid; newer certs should use active logs</td></tr>
+<tr><td>CT log is rejected</td><td>Log rejected by browser trust programs</td><td>SCTs may not satisfy CT requirements</td></tr>
+<tr><td><code>&gt;&gt;&gt;INVALID&lt;&lt;&lt;</code> signature</td><td>SCT signature verification failed</td><td>Serious finding &mdash; investigate certificate legitimacy</td></tr>
+<tr><td>Unknown CT Log</td><td>Log ID not in the known log list</td><td>Log may be new, private, or the list may be outdated</td></tr>
+</table>
+
+<h3>Security Headers</h3>
+<table>
+<tr><th>Message</th><th>Cause</th><th>Action</th></tr>
+<tr><td><code>&gt;&gt;&gt;MISSING&lt;&lt;&lt;</code></td><td>Recommended security header not present</td><td>Configure the web server to send the header</td></tr>
+</table>
+
+<h3>AI Evaluation Errors</h3>
+<table>
+<tr><th>Message</th><th>Cause</th><th>Action</th></tr>
+<tr><td>AI evaluation failed: Invalid API key</td><td>The configured API key was rejected by the provider</td><td>Check the API key in <b>File &gt; Settings &gt; AI</b></td></tr>
+<tr><td>AI evaluation failed: Rate limit exceeded</td><td>Too many requests to the AI provider</td><td>Wait and try again, or switch to a different model</td></tr>
+<tr><td>AI evaluation failed: ... call failed</td><td>Network error or provider unavailable</td><td>Check network connectivity; for Ollama, verify the server is running</td></tr>
+</table>
+
+<h3>General</h3>
+<table>
+<tr><th>Message</th><th>Cause</th><th>Action</th></tr>
+<tr><td><code>Error=...</code></td><td>Unexpected exception during scan</td><td>Check the scan log for full details</td></tr>
+<tr><td>Must-Staple set but no stapling</td><td>Certificate requires stapling but server does not provide it</td><td>Enable OCSP stapling on the server</td></tr>
+</table>
+
+<h2>19. Glossary</h2>
+<table>
+<tr><th>Term</th><th>Definition</th></tr>
+<tr><td>CA</td><td>Certificate Authority &mdash; an entity that issues digital certificates</td></tr>
+<tr><td>CBC</td><td>Cipher Block Chaining &mdash; a block cipher mode vulnerable to certain attacks in older TLS versions</td></tr>
+<tr><td>CIDR</td><td>Classless Inter-Domain Routing &mdash; notation for specifying IP address ranges using a prefix length (e.g., 10.0.0.0/24)</td></tr>
+<tr><td>CRL</td><td>Certificate Revocation List &mdash; a list of revoked certificate serial numbers published by a CA</td></tr>
+<tr><td>CSP</td><td>Content Security Policy &mdash; an HTTP header that controls which resources a browser may load</td></tr>
+<tr><td>CT</td><td>Certificate Transparency &mdash; a system of public logs recording issued certificates</td></tr>
+<tr><td>ECC</td><td>Elliptic Curve Cryptography &mdash; a public key algorithm using elliptic curves</td></tr>
+<tr><td>HSTS</td><td>HTTP Strict Transport Security &mdash; forces browsers to use HTTPS only</td></tr>
+<tr><td>LLM</td><td>Large Language Model &mdash; the AI models used by the AI Assistant and AI Evaluation features</td></tr>
+<tr><td>OCSP</td><td>Online Certificate Status Protocol &mdash; real-time certificate revocation checking</td></tr>
+<tr><td>OneCRL</td><td>Mozilla's centralized revocation list for high-priority revocations</td></tr>
+<tr><td>PEM</td><td>Privacy Enhanced Mail &mdash; a Base64-encoded certificate format</td></tr>
+<tr><td>SAN</td><td>Subject Alternative Name &mdash; additional hostnames a certificate covers</td></tr>
+<tr><td>SCT</td><td>Signed Certificate Timestamp &mdash; proof that a certificate was submitted to a CT log</td></tr>
+<tr><td>TLS</td><td>Transport Layer Security &mdash; the protocol securing HTTPS connections (successor to SSL)</td></tr>
+<tr><td>X.509</td><td>The standard format for public key certificates used in TLS</td></tr>
+</table>
+
+</body>
+</html>

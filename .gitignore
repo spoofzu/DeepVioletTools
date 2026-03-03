@@ -1,6 +1,49 @@
+# macOS
 .DS_Store
+
+# Eclipse
 .classpath
 .project
-.settings
-/target/
-/bin/
+.settings/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+
+# Compiled class files
+*.class
+
+# Log files
+*.log
+dv.log.dir_IS_UNDEFINED/
+
+# Package files
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Virtual machine crash logs
+hs_err_pid*
+replay_pid*
+
+# Claude Code
+CLAUDE.md
+.claude/
