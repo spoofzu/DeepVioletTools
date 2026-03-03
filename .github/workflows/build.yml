@@ -32,14 +32,14 @@ jobs:
       - name: Upload dvui artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dvui-jar
+          name: dvui-jar-java${{ matrix.java-version }}
           path: target/dvui.jar
           if-no-files-found: error
 
       - name: Upload dvcli artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dvcli-jar
+          name: dvcli-jar-java${{ matrix.java-version }}
           path: target/dvcli.jar
           if-no-files-found: error
 
@@ -58,7 +58,7 @@ jobs:
       - name: Download dvcli artifact
         uses: actions/download-artifact@v4
         with:
-          name: dvcli-jar
+          name: dvcli-jar-java21
 
       - name: Run help command
         run: java -jar dvcli.jar -h
