@@ -137,6 +137,8 @@ public class MainFrm extends JFrame {
 	private Timer aiDotTimer;
 	private int aiDotCount;
 
+	private ScanResult.HostResult aiActiveHost;
+
 	private JButton btnScanSelector;
 	private String selectedScanLabel;
 	private String selectedScanText;
@@ -391,7 +393,19 @@ public class MainFrm extends JFrame {
 		mainTabs.addChangeListener(e -> {
 			if (mainTabs.getSelectedIndex() == 1) {
 				getRootPane().setDefaultButton(btnAiSend);
-				syncScanSelector();
+				// Re-sync aiActiveHost with the card currently selected on the Scan tab
+				if (scanResultsPanel.isDetailShowing()) {
+					ScanResult.HostResult cardHost = scanResultsPanel.getSelectedHostResult();
+					if (cardHost != null && cardHost != aiActiveHost) {
+						aiActiveHost = cardHost;
+						chatHistory.clear();
+					}
+				}
+				if (aiActiveHost != null) {
+					updateAiWelcomeMessage();
+				} else {
+					syncScanSelector();
+				}
 				javax.swing.SwingUtilities.invokeLater(() -> txtAiInput.requestFocusInWindow());
 			} else if (mainTabs.getSelectedIndex() == 0) {
 				getRootPane().setDefaultButton(btnScan);
@@ -1215,6 +1229,28 @@ public class MainFrm extends JFrame {
 		scanResultsPanel.addPropertyChangeListener("viewState", e -> {
 			updateSaveButtons();
 			updateExternalDetail();
+			// Track host selection for AI
+			ScanResult.HostResult previousHost = aiActiveHost;
+			if (scanResultsPanel.isDetailShowing()) {
+				aiActiveHost = scanResultsPanel.getSelectedHostResult();
+			} else {
+				aiActiveHost = null;
+			}
+			updateAiTabState();
+			// Clear chat when host changes
+			if (previousHost != aiActiveHost) {
+				chatHistory.clear();
+				if (aiTerminal != null) {
+					aiTerminal.clearSelection();
+					aiTerminal.clear();
+					aiTerminal.write(fmtSystem("Welcome to DeepViolet AI Assistant."));
+					if (aiActiveHost != null) {
+						aiTerminal.write(fmtSystem("Ready for questions about: "
+								+ aiActiveHost.getTargetUrl() + "\n"));
+					}
+				}
+				updateScanSelectorButton();
+			}
 		});
 
 		dockableResultsPanel = new DockablePanel(scanResultsPanel, "Scan Results");
@@ -2430,16 +2466,15 @@ public class MainFrm extends JFrame {
 		updateSaveButtons();
 		btnClearScan.setVisible(scanResultsPanel.hasResults());
 
-		// Update AI terminal with ready message
-		if (aiTerminal != null) {
+		// Scan data now available; re-evaluate AI tab state.
+		// For multi-target scans, AI tab stays disabled until a host card is clicked.
+		// For single-target scans, enable AI immediately with a ready message.
+		if (result.getTotalTargets() == 1 && aiTerminal != null) {
 			aiTerminal.clearSelection();
 			aiTerminal.clear();
 			aiTerminal.write(fmtSystem("Welcome to DeepViolet AI Assistant."));
-			aiTerminal.write(fmtSystem("Ready for questions about scan ("
-					+ result.getTotalTargets() + " targets) on " + datetime + "\n"));
+			aiTerminal.write(fmtSystem("Ready for questions about scan on " + datetime + "\n"));
 		}
-
-		// Scan data now available; re-evaluate AI tab state
 		updateAiTabState();
 	}
 
@@ -3329,7 +3364,13 @@ public class MainFrm extends JFrame {
 
 		// Welcome message — after button is populated so we know if saved scans exist
 		updateAiWelcomeMessage();
-		btnScanSelector.addActionListener(e -> showScanSelectorPopup());
+		btnScanSelector.addActionListener(e -> {
+			if (currentScanResult != null && currentScanResult.getTotalTargets() > 1) {
+				showHostSelectorPopup();
+			} else {
+				showScanSelectorPopup();
+			}
+		});
 		gc.gridx = 0;
 		gc.fill = GridBagConstraints.HORIZONTAL;
 		gc.weightx = 0.0;
@@ -3373,7 +3414,11 @@ public class MainFrm extends JFrame {
 
 		// Build system context: include scan report if available
 		String systemContext = themePrefs.getAiChatSystemPrompt();
-		if (selectedScanText != null && !selectedScanText.isBlank()) {
+		if (aiActiveHost != null) {
+			systemContext += "\n\nHere is the TLS scan report for "
+					+ aiActiveHost.getTargetUrl() + ":\n"
+					+ hostResultToPlainText(aiActiveHost);
+		} else if (selectedScanText != null && !selectedScanText.isBlank()) {
 			systemContext += "\n\nHere is the current TLS scan report for context:\n"
 					+ selectedScanText;
 		} else if (currentScanResult != null) {
@@ -3528,6 +3573,18 @@ public class MainFrm extends JFrame {
 		aiTerminal.clear();
 		aiTerminal.write(fmtSystem("Welcome to DeepViolet AI Assistant."));
 
+		// Host card selected — show host-specific ready message
+		if (aiActiveHost != null) {
+			updateScanSelectorButton();
+			if (!themePrefs.isAiReady()) {
+				aiTerminal.write(fmtSystem("API key not configured. Go to System > Settings > AI to enter your API key.\n"));
+			} else {
+				aiTerminal.write(fmtSystem("Ready for questions about: "
+						+ aiActiveHost.getTargetUrl() + "\n"));
+			}
+			return;
+		}
+
 		if (!cachedScanFiles.isEmpty()) {
 			String topLabel = formatScanLabel(cachedScanFiles.get(0).getName());
 			loadScanFromFileSilent(cachedScanFiles.get(0));
@@ -3551,13 +3608,14 @@ public class MainFrm extends JFrame {
 
 	/**
 	 * Returns true if the AI Assistant tab should be enabled.
-	 * Requires: AI enabled + API key configured (or Ollama) + scan data available.
+	 * Requires: AI configured AND either a host card selected (multi-target)
+	 * or scan data available (individual/saved scans).
 	 */
 	private boolean isAiTabEnabled() {
 		if (!themePrefs.isAiReady()) return false;
-		// Check for scan data: saved files on disk, or in-memory scan result
+		if (aiActiveHost != null) return true;
 		if (selectedScanText != null && !selectedScanText.isBlank()) return true;
-		if (currentScanResult != null) return true;
+		if (currentScanResult != null && currentScanResult.getTotalTargets() == 1) return true;
 		if (!cachedScanFiles.isEmpty()) return true;
 		return false;
 	}
@@ -3576,7 +3634,10 @@ public class MainFrm extends JFrame {
 	private void updateAiReadyMessage() {
 		if (aiTerminal == null) return;
 
-		if (selectedScanText != null && selectedScanLabel != null) {
+		if (aiActiveHost != null) {
+			aiTerminal.write(fmtSystem("Ready for questions about: "
+					+ aiActiveHost.getTargetUrl() + "\n"));
+		} else if (selectedScanText != null && selectedScanLabel != null) {
 			aiTerminal.write(fmtSystem("Ready for questions about: " + selectedScanLabel + "\n"));
 		} else if (currentScanResult != null) {
 			String datetime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
@@ -3597,41 +3658,50 @@ public class MainFrm extends JFrame {
 		sb.append("Successful: ").append(result.getSuccessCount()).append("\n");
 		sb.append("Errors: ").append(result.getErrorCount()).append("\n\n");
 		for (ScanResult.HostResult hr : result.getResults()) {
-			sb.append("=== ").append(hr.getTargetUrl()).append(" ===\n");
-			if (hr.isSuccess() && hr.getScanTree() != null) {
-				hr.getScanTree().walkVisible(node -> {
-					String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
-					switch (node.getType()) {
-						case SECTION:
-							sb.append("\n[").append(node.getKey()).append("]\n");
-							break;
-						case SUBSECTION:
-							sb.append(indent).append(node.getKey()).append(":\n");
-							break;
-						case KEY_VALUE:
-							sb.append(indent).append(node.getKey()).append("=").append(node.getValue()).append("\n");
-							break;
-						case WARNING:
-							sb.append(indent).append(node.getKey()).append("\n");
-							break;
-						case NOTICE:
-							sb.append(node.getKey()).append("\n");
-							break;
-						case CONTENT:
-							sb.append(indent).append(node.getKey()).append("\n");
-							break;
-						case BLANK:
-							sb.append("\n");
-							break;
-						default:
-							break;
-					}
-				});
-			} else if (!hr.isSuccess()) {
-				sb.append("Error: ").append(hr.getErrorMessage()).append("\n");
-			}
-			sb.append("\n");
+			sb.append(hostResultToPlainText(hr));
 		}
+		return sb.toString();
+	}
+
+	/**
+	 * Convert a single {@link ScanResult.HostResult} to plain text for AI context.
+	 */
+	private String hostResultToPlainText(ScanResult.HostResult hr) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("=== ").append(hr.getTargetUrl()).append(" ===\n");
+		if (hr.isSuccess() && hr.getScanTree() != null) {
+			hr.getScanTree().walkVisible(node -> {
+				String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
+				switch (node.getType()) {
+					case SECTION:
+						sb.append("\n[").append(node.getKey()).append("]\n");
+						break;
+					case SUBSECTION:
+						sb.append(indent).append(node.getKey()).append(":\n");
+						break;
+					case KEY_VALUE:
+						sb.append(indent).append(node.getKey()).append("=").append(node.getValue()).append("\n");
+						break;
+					case WARNING:
+						sb.append(indent).append(node.getKey()).append("\n");
+						break;
+					case NOTICE:
+						sb.append(node.getKey()).append("\n");
+						break;
+					case CONTENT:
+						sb.append(indent).append(node.getKey()).append("\n");
+						break;
+					case BLANK:
+						sb.append("\n");
+						break;
+					default:
+						break;
+				}
+			});
+		} else if (!hr.isSuccess()) {
+			sb.append("Error: ").append(hr.getErrorMessage()).append("\n");
+		}
+		sb.append("\n");
 		return sb.toString();
 	}
 
@@ -3704,6 +3774,16 @@ public class MainFrm extends JFrame {
 
 	private void updateScanSelectorButton() {
 		if (btnScanSelector == null) return;
+
+		if (aiActiveHost != null) {
+			String host = aiActiveHost.getTargetUrl();
+			btnScanSelector.setText(truncateLabel(host, 35) + " \u25BE");
+			btnScanSelector.setToolTipText(host);
+			// Enable if multi-target scan so user can switch hosts
+			btnScanSelector.setEnabled(currentScanResult != null
+					&& currentScanResult.getTotalTargets() > 1);
+			return;
+		}
 
 		if (selectedScanLabel != null) {
 			btnScanSelector.setText(truncateLabel(selectedScanLabel, 35) + " \u25BE");
@@ -3927,6 +4007,102 @@ public class MainFrm extends JFrame {
 		popup.add(content);
 		popup.show(btnScanSelector, 0, btnScanSelector.getHeight());
 		javax.swing.SwingUtilities.invokeLater(() -> filterField.requestFocusInWindow());
+	}
+
+	/**
+	 * Show a popup listing hosts from the current multi-target scan result.
+	 * Selecting a host switches AI context to that host.
+	 */
+	private void showHostSelectorPopup() {
+		if (currentScanResult == null) return;
+
+		JPopupMenu popup = new JPopupMenu();
+		popup.setLayout(new java.awt.BorderLayout());
+
+		JPanel content = new JPanel(new java.awt.BorderLayout(0, 4));
+		content.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+
+		// Filter field
+		JTextField filterField = new JTextField();
+		filterField.setToolTipText("Regex filter (e.g. google.*)");
+		content.add(filterField, java.awt.BorderLayout.NORTH);
+
+		// List
+		DefaultListModel<String> listModel = new DefaultListModel<>();
+		JList<String> list = new JList<>(listModel);
+		list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		list.setVisibleRowCount(8);
+		JScrollPane listScroll = new JScrollPane(list);
+		listScroll.setPreferredSize(new Dimension(300, 160));
+		content.add(listScroll, java.awt.BorderLayout.CENTER);
+
+		populateHostList(listModel, "");
+
+		// Filter listener
+		filterField.getDocument().addDocumentListener(new DocumentListener() {
+			@Override
+			public void insertUpdate(DocumentEvent e) { populateHostList(listModel, filterField.getText()); }
+			@Override
+			public void removeUpdate(DocumentEvent e) { populateHostList(listModel, filterField.getText()); }
+			@Override
+			public void changedUpdate(DocumentEvent e) { populateHostList(listModel, filterField.getText()); }
+		});
+
+		// Selection listener — single click selects
+		list.addMouseListener(new java.awt.event.MouseAdapter() {
+			@Override
+			public void mouseClicked(java.awt.event.MouseEvent e) {
+				String selected = list.getSelectedValue();
+				if (selected == null) return;
+				popup.setVisible(false);
+
+				// Find matching HostResult
+				for (ScanResult.HostResult hr : currentScanResult.getResults()) {
+					if (hr.getTargetUrl().equals(selected)) {
+						aiActiveHost = hr;
+						chatHistory.clear();
+						if (aiTerminal != null) {
+							aiTerminal.clear();
+							aiTerminal.write(fmtSystem("Welcome to DeepViolet AI Assistant."));
+							aiTerminal.write(fmtSystem("Ready for questions about: "
+									+ hr.getTargetUrl() + "\n"));
+						}
+						updateScanSelectorButton();
+						return;
+					}
+				}
+			}
+		});
+
+		popup.add(content);
+		popup.show(btnScanSelector, 0, btnScanSelector.getHeight());
+		javax.swing.SwingUtilities.invokeLater(() -> filterField.requestFocusInWindow());
+	}
+
+	/**
+	 * Populate a list model with host URLs from the current scan result,
+	 * optionally filtered by a regex pattern.
+	 */
+	private void populateHostList(DefaultListModel<String> model, String filterText) {
+		model.clear();
+		if (currentScanResult == null) return;
+
+		String trimmed = filterText.trim();
+		Pattern pattern = null;
+		if (!trimmed.isEmpty()) {
+			try {
+				pattern = Pattern.compile(trimmed, Pattern.CASE_INSENSITIVE);
+			} catch (PatternSyntaxException e) {
+				return;
+			}
+		}
+
+		for (ScanResult.HostResult hr : currentScanResult.getResults()) {
+			String url = hr.getTargetUrl();
+			if (pattern == null || pattern.matcher(url).find()) {
+				model.addElement(url);
+			}
+		}
 	}
 
 	private static final String NO_REPORT_ITEM = "No report selected";
