@@ -22,7 +22,7 @@ with explanations of the terminology, values, and warning messages you may encou
 <h2>1. How to Read a Report</h2>
 <p>A DeepViolet scan report is organized into sections, each enclosed in
 <code>[Section Name]</code> brackets. Sections appear in the order they are
-enabled in <b>File &gt; Settings &gt; Engine</b>.</p>
+enabled in <b>System &gt; Settings &gt; Engine</b>.</p>
 <p><b>Color coding:</b> The results pane uses syntax highlighting to
 distinguish different types of information:</p>
 <ul>
@@ -30,6 +30,7 @@ distinguish different types of information:</p>
 <li><b>Subsection labels</b> appear bold in the subsection color</li>
 <li><b>Key=Value pairs</b> show keys and values in distinct colors</li>
 <li><b>Warnings</b> are highlighted in the warning color</li>
+<li><b>Risk deductions</b> are color-coded by severity: CRITICAL, HIGH, MEDIUM, LOW, and INFO each appear in a distinct color</li>
 </ul>
 <p><b>Warning markers:</b> Issues requiring attention are wrapped in
 <code>&gt;&gt;&gt;...&lt;&lt;&lt;</code> markers. For example,
@@ -180,11 +181,36 @@ wrapped in brackets when constructing URLs.</li>
 and is the preferred format for specifying IPv6 with a port.</li>
 </ul>
 
-<h2>4. AI Assistant</h2>
+<h2>4. Delta Scanning</h2>
+<p>Delta scanning compares two previously saved <code>.dvscan</code> files to identify
+changes in a server's TLS configuration over time. Click the <b>Delta</b> toolbar button
+to open the comparison dialog.</p>
+
+<h3>How to Use</h3>
+<ol>
+<li>Select a <b>Base</b> scan file (the earlier snapshot)</li>
+<li>Select a <b>Target</b> scan file (the later snapshot)</li>
+<li>Click <b>Compare</b> to generate the delta report</li>
+</ol>
+
+<h3>Delta Report</h3>
+<p>The delta report shows per-host changes organized by category:</p>
+<ul>
+<li><b>Risk changes</b> &mdash; score and grade differences</li>
+<li><b>Cipher changes</b> &mdash; added or removed cipher suites</li>
+<li><b>Fingerprint changes</b> &mdash; TLS fingerprint differences</li>
+<li><b>Added hosts</b> &mdash; hosts present in the target but not the base</li>
+<li><b>Removed hosts</b> &mdash; hosts present in the base but not the target</li>
+</ul>
+<p>The status bar summarizes the delta: changed, added, and removed host counts.</p>
+<p><b>CLI:</b> Use <code>--delta base.dvscan,target.dvscan</code> to compare two scan files
+from the command line.</p>
+
+<h2>5. AI Assistant</h2>
 <p>The <b>AI Assistant</b> tab provides a terminal-style chat interface for asking
 questions about scan results. To use it:</p>
 <ol>
-<li>Enable AI in <b>File &gt; Settings &gt; AI &gt; Configuration</b> and configure a provider</li>
+<li>Enable AI in <b>System &gt; Settings &gt; AI &gt; Configuration</b> and configure a provider</li>
 <li>Switch to the <b>AI Assistant</b> tab</li>
 <li>Choose a <b>Scan Type</b> using the radio buttons: <b>Individual</b> for single-host scans or <b>Multi-Target</b> for multi-target scans</li>
 <li>Select a scan from the scan selector dropdown (shows saved scans of the selected type)</li>
@@ -206,12 +232,12 @@ understand previous context. Selecting a different scan from the dropdown resets
 Chat history is logged to <code>~/DeepVioletTools/ui/aichat.log</code>.</p>
 
 <h3>Terminal Colors</h3>
-<p>The AI terminal appearance can be customized in <b>File &gt; Settings &gt; AI &gt; Terminal Colors</b>.
+<p>The AI terminal appearance can be customized in <b>System &gt; Settings &gt; AI &gt; Terminal Colors</b>.
 Nine color controls are available for background, system text, user prefix/text,
 AI prefix/text, error text, and selection colors.</p>
 
-<h2>5. Card Layout Editor</h2>
-<p>The <b>Cards</b> sub-tab in <b>File &gt; Settings &gt; Reporting</b> lets you
+<h2>6. Card Layout Editor</h2>
+<p>The <b>Cards</b> sub-tab in <b>System &gt; Settings &gt; Reporting</b> lets you
 customize the appearance of host cards used in scan results.</p>
 
 <h3>Grid Editor</h3>
@@ -248,9 +274,9 @@ return it to a single cell.</p>
 data. The preview updates in real time as you edit the layout, adjust alignment,
 resize cell proportions, or change card font and color settings.</p>
 
-<h2>6. Custom Overlays</h2>
+<h2>7. Custom Overlays</h2>
 <p>DeepViolet supports two custom overlay features that let you extend or replace
-built-in data with your own YAML definitions. Both are configured in <b>File &gt; Settings</b>.</p>
+built-in data with your own YAML definitions. Both are configured in <b>System &gt; Settings</b>.</p>
 
 <h3>Custom Cipher Map</h3>
 <p>The <b>Cipher Map</b> settings tab lets you replace the built-in cipher suite map
@@ -286,7 +312,7 @@ that are merged with the built-in system rules during scoring. Custom rules use
 <p><b>CLI:</b> Use <code>--riskrules &lt;path&gt;</code> to load user risk rules
 from a YAML file. The CLI flag overrides the saved GUI preference.</p>
 
-<h2>7. Report Header</h2>
+<h2>8. Report Header</h2>
 <p>The header section provides context about the scan environment:</p>
 <ul>
 <li><b>DeepViolet version</b> and report timestamp</li>
@@ -295,7 +321,7 @@ from a YAML file. The CLI flag overrides the saved GUI preference.</p>
 <li><b>Log file</b> &mdash; location of the detailed scan log for troubleshooting</li>
 </ul>
 
-<h2>8. TLS Risk Assessment</h2>
+<h2>9. TLS Risk Assessment</h2>
 <p>The risk assessment provides an overall security evaluation of the target server.</p>
 
 <h3>Scoring</h3>
@@ -318,16 +344,19 @@ for security weaknesses found during the scan. The score maps to a letter grade:
 <li><b>Inconclusive blocks</b> (amber) &mdash; could not be determined</li>
 <li><b>Fail blocks</b> (red) &mdash; points deducted</li>
 </ul>
-<p>The scale (blocks per bar) is configurable in <b>File &gt; Settings &gt; Reporting &gt; Report Colors &gt; TLS Risk Assessment &gt; Scale</b>.</p>
+<p>The scale (blocks per bar) is configurable in <b>System &gt; Settings &gt; Reporting &gt; Report Colors &gt; TLS Risk Assessment &gt; Scale</b>.</p>
 
 <h3>Deductions</h3>
-<p>Below each category, individual deductions are listed with severity levels:</p>
+<p>Below each category, individual deductions are listed in the format
+<code>RULE-ID [SEVERITY] Description (score: N.NN)</code> and color-coded by severity:</p>
 <ul>
-<li><b>LOW</b> &mdash; minor issue, small point deduction</li>
-<li><b>MEDIUM</b> &mdash; notable weakness</li>
-<li><b>HIGH</b> &mdash; significant vulnerability</li>
 <li><b>CRITICAL</b> &mdash; severe security issue</li>
+<li><b>HIGH</b> &mdash; significant vulnerability</li>
+<li><b>MEDIUM</b> &mdash; notable weakness</li>
+<li><b>LOW</b> &mdash; minor issue, small point deduction</li>
+<li><b>INFO</b> &mdash; informational observation, minimal or no point deduction</li>
 </ul>
+<p>Severity colors are configurable in <b>System &gt; Settings &gt; Reporting &gt; Report Colors &gt; TLS Risk Assessment</b>.</p>
 
 <h3>Other &amp; SAN Disclosure</h3>
 <p>The <b>Other</b> category (20 points) checks for miscellaneous issues including
@@ -342,24 +371,23 @@ increasing the visible attack surface.</p>
 <tr><td>21+</td><td>HIGH</td><td>15 pts</td></tr>
 </table>
 
-<h2>9. AI Evaluation</h2>
-<p>When AI is enabled (<b>File &gt; Settings &gt; AI</b>), the report can include
+<h2>10. AI Evaluation</h2>
+<p>When AI is enabled (<b>System &gt; Settings &gt; AI</b>), the report can include
 an AI-powered analysis section after the risk assessment. The scan report generated
 so far is sent to the configured AI provider, which returns a structured analysis.</p>
 <p>The AI evaluation typically includes:</p>
 <ul>
 <li><b>Executive Summary</b> &mdash; overall TLS security posture assessment</li>
-<li><b>Per-Finding Analysis</b> &mdash; for each risk assessment item: what it is, why it matters, and remediation</li>
+<li><b>Per-Finding Analysis</b> &mdash; for each risk assessment finding: what it is, why it matters, and remediation. Each finding header is color-coded by severity (CRITICAL, HIGH, MEDIUM, LOW, INFO) using the same colors as the TLS Risk Assessment deductions.</li>
 <li><b>Positive Findings</b> &mdash; security measures that are properly configured</li>
 <li><b>Recommendations</b> &mdash; prioritized action items</li>
 </ul>
 <p>The system prompt that controls the analysis can be customized in
-<b>File &gt; Settings &gt; AI &gt; Prompts &gt; Report System Prompt</b>.
-Lines prefixed with "CRITICAL:" or "WARNING:" are highlighted as warnings in the report.</p>
+<b>System &gt; Settings &gt; AI &gt; Prompts &gt; Report System Prompt</b>.</p>
 <p>If the AI provider is unreachable or returns an error, the section shows a
 warning message with the failure reason.</p>
 
-<h2>10. Host Information</h2>
+<h2>11. Host Information</h2>
 <p>This section shows DNS resolution details for the target:</p>
 <ul>
 <li><b>Hostname</b> &mdash; the name you entered</li>
@@ -367,14 +395,14 @@ warning message with the failure reason.</p>
 <li><b>Canonical name</b> &mdash; the canonical hostname returned by DNS (may differ if the host is a CNAME alias)</li>
 </ul>
 
-<h2>11. HTTP Response Headers</h2>
+<h2>12. HTTP Response Headers</h2>
 <p>Raw HTTP response headers returned by the server. These headers control
 browser behavior, caching, content negotiation, and more. They are listed as
 key=value pairs exactly as received from the server.</p>
 <p>This section provides the raw data; for security-specific analysis, see the
 <b>Security Headers Analysis</b> section below.</p>
 
-<h2>12. Security Headers Analysis</h2>
+<h2>13. Security Headers Analysis</h2>
 <p>Checks for the presence and values of security-critical HTTP response headers.
 Headers marked <code>&gt;&gt;&gt;MISSING&lt;&lt;&lt;</code> are not present and should be configured.</p>
 <table>
@@ -388,12 +416,12 @@ Headers marked <code>&gt;&gt;&gt;MISSING&lt;&lt;&lt;</code> are not present and 
 <tr><td>Permissions-Policy</td><td>Controls which browser features (camera, microphone, geolocation, etc.) the page may use.</td></tr>
 </table>
 
-<h2>13. Connection Characteristics</h2>
+<h2>14. Connection Characteristics</h2>
 <p>TLS session properties and socket configuration details for the connection,
 including protocol versions, keepalive settings, buffer sizes, and TCP nodelay.
 These reflect how the underlying Java TLS socket is configured for the scan.</p>
 
-<h2>14. Cipher Suites</h2>
+<h2>15. Cipher Suites</h2>
 <p>A cipher suite defines the set of cryptographic algorithms used for a TLS connection:
 key exchange, authentication, encryption, and message authentication. This section lists
 all cipher suites the server is willing to negotiate.</p>
@@ -409,7 +437,7 @@ all cipher suites the server is willing to negotiate.</p>
 
 <h3>Naming Conventions</h3>
 <p>Cipher suite names vary by library. DeepViolet supports four naming conventions,
-configurable in <b>File &gt; Settings &gt; Engine &gt; Cipher Suite Naming</b>:</p>
+configurable in <b>System &gt; Settings &gt; Engine &gt; Cipher Suite Naming</b>:</p>
 <ul>
 <li><b>IANA</b> &mdash; standard names (default, e.g., TLS_AES_256_GCM_SHA384)</li>
 <li><b>OpenSSL</b> &mdash; OpenSSL names (e.g., AES256-GCM-SHA384)</li>
@@ -419,7 +447,7 @@ configurable in <b>File &gt; Settings &gt; Engine &gt; Cipher Suite Naming</b>:<
 <p>Servers supporting only WEAK or CLEAR ciphers are at significant risk.
 Best practice: enable only STRONG ciphers and disable all others.</p>
 
-<h2>15. Certificate Chain</h2>
+<h2>16. Certificate Chain</h2>
 <p>TLS servers present a certificate chain for identity verification. The chain
 typically includes:</p>
 <ol>
@@ -453,7 +481,7 @@ show the number of days since expiration.</p>
 and for ECC certificates, the named curve (e.g., secp256r1). Larger keys generally
 provide stronger security but slower handshakes.</p>
 
-<h2>16. Revocation Status</h2>
+<h2>17. Revocation Status</h2>
 <p>Certificate revocation checking verifies that certificates have not been
 invalidated by their issuing CA. DeepViolet checks multiple revocation mechanisms:</p>
 
@@ -494,7 +522,7 @@ Signed Certificate Timestamps (SCTs) prove a certificate was submitted to a CT l
 <p>An <code>&gt;&gt;&gt;INVALID&lt;&lt;&lt;</code> signature is a serious finding that
 may indicate a forged or corrupted SCT.</p>
 
-<h2>17. TLS Server Fingerprint</h2>
+<h2>18. TLS Server Fingerprint</h2>
 <p>The fingerprint characterizes a server's TLS implementation by sending 10 different
 probe handshakes and hashing the combined results.</p>
 
@@ -513,7 +541,7 @@ or <b>FAIL</b> (did not complete).</p>
 <p>The fingerprint is displayed as colon-delimited hex octets. An <b>Extension Hash</b>
 provides additional characterization based on TLS extensions offered by the server.</p>
 
-<h2>18. Common Errors</h2>
+<h2>19. Common Errors</h2>
 <p>The following table lists warning messages that may appear in reports, their causes,
 and recommended actions.</p>
 
@@ -552,7 +580,7 @@ and recommended actions.</p>
 <h3>AI Evaluation Errors</h3>
 <table>
 <tr><th>Message</th><th>Cause</th><th>Action</th></tr>
-<tr><td>AI evaluation failed: Invalid API key</td><td>The configured API key was rejected by the provider</td><td>Check the API key in <b>File &gt; Settings &gt; AI</b></td></tr>
+<tr><td>AI evaluation failed: Invalid API key</td><td>The configured API key was rejected by the provider</td><td>Check the API key in <b>System &gt; Settings &gt; AI</b></td></tr>
 <tr><td>AI evaluation failed: Rate limit exceeded</td><td>Too many requests to the AI provider</td><td>Wait and try again, or switch to a different model</td></tr>
 <tr><td>AI evaluation failed: ... call failed</td><td>Network error or provider unavailable</td><td>Check network connectivity; for Ollama, verify the server is running</td></tr>
 </table>
@@ -564,7 +592,7 @@ and recommended actions.</p>
 <tr><td>Must-Staple set but no stapling</td><td>Certificate requires stapling but server does not provide it</td><td>Enable OCSP stapling on the server</td></tr>
 </table>
 
-<h2>19. Glossary</h2>
+<h2>20. Glossary</h2>
 <table>
 <tr><th>Term</th><th>Definition</th></tr>
 <tr><td>CA</td><td>Certificate Authority &mdash; an entity that issues digital certificates</td></tr>

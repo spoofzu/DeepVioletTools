@@ -75,6 +75,11 @@ public class ScanNode {
 		return new ScanNode(label, null, NodeType.SUBSECTION);
 	}
 
+	/** Create a subsection label node with a risk severity level. */
+	public static ScanNode createSubsection(String label, String severity) {
+		return new ScanNode(label, null, NodeType.SUBSECTION, severity);
+	}
+
 	/** Create a key=value data node. */
 	public static ScanNode createKeyValue(String key, String value) {
 		return new ScanNode(key, value, NodeType.KEY_VALUE);
@@ -122,6 +127,11 @@ public class ScanNode {
 	/** Add a subsection label child. */
 	public ScanNode addSubsection(String label) {
 		return addChild(createSubsection(label));
+	}
+
+	/** Add a subsection label child with a risk severity level. */
+	public ScanNode addSubsection(String label, String severity) {
+		return addChild(createSubsection(label, severity));
 	}
 
 	/** Add a key=value data child. */
@@ -232,6 +242,21 @@ public class ScanNode {
 				visitor.accept(node);
 			}
 		});
+	}
+
+	/**
+	 * Check whether this node has a direct SECTION child with the given name.
+	 *
+	 * @param name section title to look for (case-insensitive)
+	 * @return true if a matching SECTION child exists
+	 */
+	public boolean hasSection(String name) {
+		for (ScanNode child : children) {
+			if (child.type == NodeType.SECTION && name.equalsIgnoreCase(child.key)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**

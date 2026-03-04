@@ -814,10 +814,10 @@ public class MainFrm extends JFrame {
 		updateAiTabState();
 		applyAiTerminalColors();
 		// Refresh AI terminal status message after settings change
-		if (aiTerminal != null && themePrefs.isAiEnabled()) {
+		if (aiTerminal != null && themePrefs.isAiChatEnabled()) {
 			aiTerminal.clear();
 			aiTerminal.write(fmtSystem("Welcome to DeepViolet AI Assistant."));
-			if (!themePrefs.isAiReady()) {
+			if (!themePrefs.isChatReady()) {
 				aiTerminal.write(fmtSystem("API key not configured. Go to System > Settings > AI to enter your API key.\n"));
 			} else {
 				updateAiReadyMessage();
@@ -2335,6 +2335,15 @@ public class MainFrm extends JFrame {
 			}
 		}
 
+		// AI evaluation — generated at scan time when enabled and configured
+		if (themePrefs.isSectionAiEvaluation() && themePrefs.isReportReady()) {
+			scanTask.setAiConfig(
+					themePrefs.getAiApiKey(), themePrefs.getAiProvider(),
+					themePrefs.getAiModel(), themePrefs.getAiMaxTokens(),
+					themePrefs.getAiTemperature(), themePrefs.getAiSystemPrompt(),
+					themePrefs.getAiEndpointUrl());
+		}
+
 		scanTask.setCompletionCallback(() ->
 				javax.swing.SwingUtilities.invokeLater(() -> onScanComplete()));
 
@@ -2692,8 +2701,11 @@ public class MainFrm extends JFrame {
 					appendStyled("[" + node.getKey() + "]\n", font, themePrefs.getHeading(), true);
 					break;
 				case SUBSECTION:
+					Color subColor = node.getSeverity() != null
+							? themePrefs.getColorForSeverity(node.getSeverity())
+							: themePrefs.getSubsection();
 					appendWrappedSingle(indent + node.getKey() + ":", indent + "   ",
-							wrap, wrapWidth, font, themePrefs.getSubsection(), true);
+							wrap, wrapWidth, font, subColor, true);
 					break;
 				case KEY_VALUE:
 					String kvLine = indent + node.getKey() + "=" + node.getValue();
@@ -2731,6 +2743,18 @@ public class MainFrm extends JFrame {
 					break;
 			}
 		});
+
+		// If AI Evaluation is enabled in settings but the tree has no AI section
+		// (e.g. loaded scan that was run without AI), show a placeholder message.
+		if (themePrefs.isSectionAiEvaluation()
+				&& (visible == null || visible.contains("AI Evaluation"))
+				&& !treeRoot.hasSection("AI Evaluation")) {
+			appendStyled("\n", font, themePrefs.getDefaultText(), false);
+			appendStyled("[AI Evaluation]\n", font, themePrefs.getHeading(), true);
+			appendStyled("   AI evaluation is only generated at scan time. "
+					+ "Run a new scan with AI evaluation enabled to generate this section.\n",
+					font, themePrefs.getContent(), false);
+		}
 	}
 
 	/**
@@ -3398,8 +3422,8 @@ public class MainFrm extends JFrame {
 	}
 
 	private void sendAiMessage() {
-		String apiKey = themePrefs.getAiApiKey();
-		boolean isOllama = "Ollama".equalsIgnoreCase(themePrefs.getAiProvider());
+		String apiKey = themePrefs.getAiChatApiKey();
+		boolean isOllama = "Ollama".equalsIgnoreCase(themePrefs.getAiChatProvider());
 		if (!isOllama && (apiKey == null || apiKey.isBlank())) {
 			aiTerminal.write(fmtError("API key not configured. Go to System > Settings > AI to enter your API key.") + "\n");
 			return;
@@ -3451,10 +3475,10 @@ public class MainFrm extends JFrame {
 			try {
 				AiAnalysisService service = new AiAnalysisService();
 				String response = service.chat(
-						chatHistory, themePrefs.getAiApiKey(),
-						themePrefs.getAiProvider(), themePrefs.getAiModel(),
-						themePrefs.getAiMaxTokens(), themePrefs.getAiTemperature(),
-						finalSystemContext, themePrefs.getAiEndpointUrl());
+						chatHistory, themePrefs.getAiChatApiKey(),
+						themePrefs.getAiChatProvider(), themePrefs.getAiChatModel(),
+						themePrefs.getAiChatMaxTokens(), themePrefs.getAiChatTemperature(),
+						finalSystemContext, themePrefs.getAiChatEndpointUrl());
 
 				// Truncate to 5 sentences BEFORE logging or storing in history
 				String cleaned = stripMarkdown(response);
@@ -3576,7 +3600,7 @@ public class MainFrm extends JFrame {
 		// Host card selected — show host-specific ready message
 		if (aiActiveHost != null) {
 			updateScanSelectorButton();
-			if (!themePrefs.isAiReady()) {
+			if (!themePrefs.isChatReady()) {
 				aiTerminal.write(fmtSystem("API key not configured. Go to System > Settings > AI to enter your API key.\n"));
 			} else {
 				aiTerminal.write(fmtSystem("Ready for questions about: "
@@ -3590,7 +3614,7 @@ public class MainFrm extends JFrame {
 			loadScanFromFileSilent(cachedScanFiles.get(0));
 			selectedScanLabel = topLabel;
 			updateScanSelectorButton();
-			if (!themePrefs.isAiReady()) {
+			if (!themePrefs.isChatReady()) {
 				aiTerminal.write(fmtSystem("Scan loaded: " + topLabel));
 				aiTerminal.write(fmtSystem("API key not configured. Go to System > Settings > AI to enter your API key.\n"));
 			} else {
@@ -3599,7 +3623,7 @@ public class MainFrm extends JFrame {
 			return;
 		}
 
-		if (!themePrefs.isAiReady()) {
+		if (!themePrefs.isChatReady()) {
 			aiTerminal.write(fmtSystem("API key not configured. Go to System > Settings > AI to enter your API key.\n"));
 		} else {
 			aiTerminal.write(fmtSystem("Scan a server to get started.\n"));
@@ -3612,7 +3636,7 @@ public class MainFrm extends JFrame {
 	 * or scan data available (individual/saved scans).
 	 */
 	private boolean isAiTabEnabled() {
-		if (!themePrefs.isAiReady()) return false;
+		if (!themePrefs.isChatReady()) return false;
 		if (aiActiveHost != null) return true;
 		if (selectedScanText != null && !selectedScanText.isBlank()) return true;
 		if (currentScanResult != null && currentScanResult.getTotalTargets() == 1) return true;

@@ -49,7 +49,7 @@ public class LogUtils {
 		if (!needsCopy) {
 			try {
 				String content = Files.readString(LOGBACK_FILE);
-				needsCopy = !content.contains("dv-logback-v4");
+				needsCopy = !content.contains("dv-logback-v6");
 			} catch (IOException ignored) {
 				needsCopy = true;
 			}

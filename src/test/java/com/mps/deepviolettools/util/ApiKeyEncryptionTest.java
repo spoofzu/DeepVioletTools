@@ -62,7 +62,7 @@ class ApiKeyEncryptionTest {
 
 		// Load existing prefs (fully initialized), set API key, save
 		FontPreferences prefs = FontPreferences.load();
-		prefs.setAiEnabled(true);
+		prefs.setAiReportEnabled(true);
 		prefs.setAiApiKey(testKey);
 		FontPreferences.save(prefs);
 
