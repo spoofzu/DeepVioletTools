@@ -223,7 +223,19 @@
         "report_version": "1.0",
         "_preamble": [
           { "type": "BLANK" },
+          { "type": "NOTICE", "text": "  ██████  ███████ ███████ ██████  ██    ██ ██  ██████  ██      ███████ ████████" },
+          { "type": "NOTICE", "text": "  ██   ██ ██      ██      ██   ██ ██    ██ ██ ██    ██ ██      ██         ██   " },
+          { "type": "NOTICE", "text": "  ██   ██ █████   █████   ██████  ██    ██ ██ ██    ██ ██      █████      ██   " },
+          { "type": "NOTICE", "text": "  ██   ██ ██      ██      ██       ██  ██  ██ ██    ██ ██      ██         ██   " },
+          { "type": "NOTICE", "text": "  ██████  ███████ ███████ ██        ████   ██  ██████  ███████ ███████    ██    " },
+          { "type": "BLANK" },
+          { "type": "NOTICE", "text": "  DeepViolet Sample Scan" },
           { "type": "NOTICE", "text": "  Server Target https://www.sample.com/" },
+          { "type": "BLANK" },
+          { "type": "NOTICE", "text": "  This software is provided for research purposes." },
+          { "type": "NOTICE", "text": "  See project information on GitHub for further details:" },
+          { "type": "NOTICE", "text": "    https://github.com/spoofzu/DeepVioletTools" },
+          { "type": "NOTICE", "text": "    https://github.com/spoofzu/DeepViolet" },
           { "type": "BLANK" }
         ],
         "TLS Risk Assessment": {

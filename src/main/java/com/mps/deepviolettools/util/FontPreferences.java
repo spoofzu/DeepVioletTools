@@ -2,6 +2,7 @@ package com.mps.deepviolettools.util;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
 import java.awt.Window;
 import java.io.File;
@@ -414,7 +415,7 @@ public class FontPreferences {
 	public static final int DEFAULT_HARDWRAP_WIDTH = 120;
 
 	// Dark theme defaults
-	public static final String DEFAULT_FONT_NAME = "Courier New";
+	public static final String DEFAULT_FONT_NAME = resolveMonospaceFont();
 	public static final int DEFAULT_FONT_SIZE = 16;
 	public static final Color DEFAULT_BG = new Color(0x0D, 0x11, 0x17);
 	public static final Color DEFAULT_TEXT = new Color(0xC9, 0xD1, 0xD9);
@@ -2564,5 +2565,55 @@ public class FontPreferences {
 			logger.error("SHA-256 not available", e);
 			return null;
 		}
+	}
+
+	/**
+	 * Resolves the best available monospace font for the current platform.
+	 * Falls back to Java's logical "Monospaced" font if no preferred font is found.
+	 */
+	private static String resolveMonospaceFont() {
+		// Register bundled fonts so they are available as manual alternatives
+		String[] bundledFonts = {
+			"/fonts/JetBrainsMono-Regular.ttf",
+			"/fonts/IBMPlexMono-Regular.ttf",
+			"/fonts/FiraMono-Regular.ttf"
+		};
+		for (String path : bundledFonts) {
+			try (InputStream is = FontPreferences.class.getResourceAsStream(path)) {
+				if (is != null) {
+					Font font = Font.createFont(Font.TRUETYPE_FONT, is);
+					if (GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font)) {
+						logger.info("Registered bundled font: {}", font.getFamily());
+					}
+				}
+			} catch (Exception e) {
+				logger.warn("Failed to register bundled font {}: {}", path, e.getMessage());
+			}
+		}
+
+		// Use the platform-preferred monospace font as the default
+		String os = System.getProperty("os.name", "").toLowerCase();
+		String[] candidates;
+		if (os.contains("mac")) {
+			candidates = new String[] { "Courier New", "Menlo", "Monospaced" };
+		} else if (os.contains("win")) {
+			candidates = new String[] { "Courier New", "Consolas", "Monospaced" };
+		} else {
+			candidates = new String[] { "DejaVu Sans Mono", "Liberation Mono", "Monospaced" };
+		}
+
+		try {
+			java.util.Set<String> available = java.util.Set.of(
+				GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()
+			);
+			for (String candidate : candidates) {
+				if ("Monospaced".equals(candidate) || available.contains(candidate)) {
+					return candidate;
+				}
+			}
+		} catch (Exception e) {
+			// Headless environment or other error — fall through
+		}
+		return "Monospaced";
 	}
 }
