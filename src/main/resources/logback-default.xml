@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- dv-logback-v4 -->
+<!-- dv-logback-v6 -->
 <configuration>
 
-  <property name="MSG_FMT" value="%d{yyyy-MM-dd HH:mm:ss} | %5level | %logger{30} | %msg%n" />
+  <property name="MSG_FMT" value="%d{yyyy-MM-dd HH:mm:ss} | %5level | %logger{30} | host=%X{host:--} | sid=%X{sessionid:--} | %msg%n" />
 
   <appender name="SCANLOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
     <file>${dv.log.dir}/scanlog.log</file>
@@ -24,6 +24,22 @@
     <immediateFlush>true</immediateFlush>
     <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
       <fileNamePattern>${dv.log.dir}/aichat.%i.log</fileNamePattern>
+      <minIndex>1</minIndex>
+      <maxIndex>3</maxIndex>
+    </rollingPolicy>
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <maxFileSize>3MB</maxFileSize>
+    </triggeringPolicy>
+    <encoder>
+      <pattern>${MSG_FMT}</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="AIINLINELOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${dv.log.dir}/aiinlinereporting.log</file>
+    <immediateFlush>true</immediateFlush>
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <fileNamePattern>${dv.log.dir}/aiinlinereporting.%i.log</fileNamePattern>
       <minIndex>1</minIndex>
       <maxIndex>3</maxIndex>
     </rollingPolicy>
@@ -59,6 +75,10 @@
 
   <logger name="aichat" level="INFO" additivity="false">
     <appender-ref ref="AICHATLOG" />
+  </logger>
+
+  <logger name="aiinlinereporting" level="INFO" additivity="false">
+    <appender-ref ref="AIINLINELOG" />
   </logger>
 
   <!-- All errors go to error.log only, not to console.

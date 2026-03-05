@@ -25,6 +25,7 @@ import javax.net.ssl.X509TrustManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import com.mps.deepviolettools.util.FontPreferences;
 
@@ -289,7 +290,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			long elapsed = System.currentTimeMillis() - t0;
 			timings.put(name, elapsed);
 			sectionOutcomes.add(new SectionOutcome(name, SectionStatus.ERROR, e.getMessage()));
-			logger.error("{} Section {} failed", logPrefix(), name, e);
+			logger.error("Section {} failed", name, e);
 		}
 		return true;
 	}
@@ -651,7 +652,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		} catch (Exception e) {
 			lastBuildError = e.getMessage();
 			section.addKeyValue("Error", e.getMessage());
-			logger.error("{} Risk assessment error", logPrefix(), e);
+			logger.error("Risk assessment error", e);
 		}
 	}
 
@@ -725,7 +726,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		} catch (Exception e) {
 			lastBuildError = e.getMessage();
 			section.addKeyValue("Error", e.getMessage());
-			logger.error("{} Can't fetch host. err={}", logPrefix(), e.getMessage(), e);
+			logger.error("Can't fetch host. err={}", e.getMessage(), e);
 		}
 
 	}
@@ -806,13 +807,13 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			} else {
 				lastBuildError = "hosts null";
 				section.addKeyValue("Error", "Problem fetching host cipher suites. See log for details.");
-				logger.error("{} Problem processing server ciphers. err=hosts null", logPrefix());
+				logger.error("Problem processing server ciphers. err=hosts null");
 			}
 
 		} catch (Exception e) {
 			lastBuildError = e.getMessage();
 			section.addKeyValue("Error", e.getMessage());
-			logger.error("{} Problem processing server ciphers. err={}", logPrefix(), e.getMessage(), e);
+			logger.error("Problem processing server ciphers. err={}", e.getMessage(), e);
 		}
 	}
 
@@ -903,7 +904,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			lastBuildError = e.getMessage();
 			section.addKeyValue("Error", e.getMessage());
 			section.addBlank();
-			logger.error("{} Problem fetching certificates. err={}", logPrefix(), e.getMessage(), e);
+			logger.error("Problem fetching certificates. err={}", e.getMessage(), e);
 		}
 
 	}
@@ -1161,7 +1162,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		} catch (Exception e) {
 			lastBuildError = e.getMessage();
 			section.addKeyValue("Error", e.getMessage());
-			logger.error("{} Revocation status error", logPrefix(), e);
+			logger.error("Revocation status error", e);
 		}
 	}
 
@@ -1483,7 +1484,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		} catch (Exception e) {
 			lastBuildError = e.getMessage();
 			section.addKeyValue("Error", e.getMessage());
-			logger.error("{} TLS fingerprint error", logPrefix(), e);
+			logger.error("TLS fingerprint error", e);
 		}
 	}
 
@@ -1597,6 +1598,21 @@ public class UIBackgroundScanTask extends BackgroundTask {
 
 		ScanNode section = root.addSection("AI Evaluation");
 
+		// Build severity map from risk assessment WARNING nodes (ruleId -> severity)
+		java.util.Map<String, String> severityMap = new java.util.HashMap<>();
+		root.walk(node -> {
+			if (node.getType() == ScanNode.NodeType.WARNING && node.getSeverity() != null) {
+				String key = node.getKey();
+				if (key != null) {
+					// Extract rule ID (first token, e.g. "SYS-0000900")
+					int space = key.indexOf(' ');
+					if (space > 0) {
+						severityMap.put(key.substring(0, space), node.getSeverity());
+					}
+				}
+			}
+		});
+
 		// Send all report sections generated so far as context
 		String reportSoFar = toPlainText();
 
@@ -1605,37 +1621,11 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			String analysis = service.analyze(reportSoFar, aiApiKey, aiProvider,
 					aiModel, aiMaxTokens, aiTemperature, aiSystemPrompt, aiEndpointUrl);
 
-			// Parse structured [Section Name] delimited response
-			ScanNode currentSub = null;
-			for (String line : analysis.split("\n")) {
-				String trimmed = line.trim();
-
-				if (trimmed.isEmpty()) {
-					continue;
-				}
-
-				// Detect [Section Name] delimiter
-				if (trimmed.startsWith("[") && trimmed.endsWith("]") && trimmed.length() > 2) {
-					String name = trimmed.substring(1, trimmed.length() - 1).trim();
-					if (!name.isEmpty()) {
-						currentSub = section.addSubsection(name);
-						continue;
-					}
-				}
-
-				// Route content to current subsection, or section if no delimiter yet
-				ScanNode target = currentSub != null ? currentSub : section;
-
-				if (trimmed.startsWith("CRITICAL:") || trimmed.startsWith("WARNING:")) {
-					target.addWarning(">>> " + trimmed + " <<<");
-				} else {
-					target.addContent(trimmed);
-				}
-			}
+			AiAnalysisService.parseAiResponse(section, analysis, severityMap);
 		} catch (AiAnalysisService.AiAnalysisException e) {
 			lastBuildError = e.getMessage();
 			section.addWarning(">>> AI evaluation failed: " + e.getMessage() + " <<<");
-			logger.error("{} AI evaluation failed", logPrefix(), e);
+			logger.error("AI evaluation failed", e);
 		}
 	}
 
@@ -1654,8 +1644,11 @@ public class UIBackgroundScanTask extends BackgroundTask {
 	 */
 	protected void doInBackground() throws Exception {
 
+		MDC.put("host", hostname);
+		MDC.put("sessionid", sessionId);
+
 		long scanStartTime = System.currentTimeMillis();
-		scanlog.info("{} Scan started url={}", logPrefix(), url);
+		scanlog.info("Scan started url={}", url);
 
 		try {
 			// Install trust-all SSLContext so DeepVioletFactory can connect to servers
@@ -1694,7 +1687,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 					} catch (DeepVioletException e) {
 						String err = "Error writing certificate to disk. msg=" + e.getMessage();
 						root.addKeyValue("Error", err);
-						logger.error("{} {}", logPrefix(), err, e);
+						logger.error("{}", err, e);
 						lastBuildError = e.getMessage();
 					}
 				})) return;
@@ -1721,14 +1714,16 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			throw e;
 		} finally {
 			long totalElapsed = System.currentTimeMillis() - scanStartTime;
-			scanlog.info("{} Network: {}", logPrefix(), formatTimings(networkTimings));
-			scanlog.info("{} Analysis: {}", logPrefix(), formatTimings(analyticalTimings));
-			scanlog.info("{} Scan completed status={}, sections={}, totalElapsed={}ms",
-					logPrefix(), determineStatus(), formatSectionCounts(), totalElapsed);
+			scanlog.info("Network: {}", formatTimings(networkTimings));
+			scanlog.info("Analysis: {}", formatTimings(analyticalTimings));
+			scanlog.info("Scan completed status={}, sections={}, totalElapsed={}ms",
+					determineStatus(), formatSectionCounts(), totalElapsed);
 			String evidence = formatEvidence();
 			if (evidence != null) {
-				scanlog.info("{} Evidence: {}", logPrefix(), evidence);
+				scanlog.info("Evidence: {}", evidence);
 			}
+			MDC.remove("host");
+			MDC.remove("sessionid");
 		}
 
 	}

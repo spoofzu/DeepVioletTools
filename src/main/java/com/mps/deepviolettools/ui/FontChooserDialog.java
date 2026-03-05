@@ -109,20 +109,35 @@ public class FontChooserDialog extends JDialog {
 	private JSpinner spnWorkerThreads;
 	private JSpinner spnThrottleDelayMs;
 
-	// AI tab controls
-	private JCheckBox chkAiEnabled;
-	private JComboBox<String> cmbAiProvider;
-	private JPasswordField txtAiApiKey;
-	private JLabel lblAiApiKey;
-	private JTextField txtAiEndpointUrl;
-	private JLabel lblAiEndpointUrl;
-	private JComboBox<String> cmbAiModel;
-	private JSpinner spnAiMaxTokens;
-	private JSpinner spnAiTemperature;
+	// AI Chat config controls
+	private JCheckBox chkAiChatEnabled;
+	private JComboBox<String> cmbAiChatProvider;
+	private JPasswordField txtAiChatApiKey;
+	private JLabel lblAiChatApiKey;
+	private JTextField txtAiChatEndpointUrl;
+	private JLabel lblAiChatEndpointUrl;
+	private JComboBox<String> cmbAiChatModel;
+	private JSpinner spnAiChatMaxTokens;
+	private JSpinner spnAiChatTemperature;
+	private JButton btnAiChatTest;
+	private JLabel lblAiChatTestResult;
+
+	// AI Report config controls
+	private JCheckBox chkAiReportEnabled;
+	private JComboBox<String> cmbAiReportProvider;
+	private JPasswordField txtAiReportApiKey;
+	private JLabel lblAiReportApiKey;
+	private JTextField txtAiReportEndpointUrl;
+	private JLabel lblAiReportEndpointUrl;
+	private JComboBox<String> cmbAiReportModel;
+	private JSpinner spnAiReportMaxTokens;
+	private JSpinner spnAiReportTemperature;
+	private JButton btnAiReportTest;
+	private JLabel lblAiReportTestResult;
+
+	// AI Prompts controls
 	private JTextArea txtAiSystemPrompt;
 	private JTextArea txtAiChatSystemPrompt;
-	private JButton btnAiTest;
-	private JLabel lblAiTestResult;
 
 	// AI Terminal Colors controls
 	private JButton btnAiTermBg;
@@ -879,7 +894,7 @@ public class FontChooserDialog extends JDialog {
 
 		chkAiEvaluation = new JCheckBox("AI evaluation");
 		chkAiEvaluation.setSelected(prefs.isSectionAiEvaluation());
-		boolean aiConfigured = prefs.isAiEnabled()
+		boolean aiConfigured = prefs.isAiReportEnabled()
 				&& ("Ollama".equalsIgnoreCase(prefs.getAiProvider())
 					|| (prefs.getAiApiKey() != null && !prefs.getAiApiKey().isBlank()));
 		chkAiEvaluation.setEnabled(aiConfigured);
@@ -1071,171 +1086,70 @@ public class FontChooserDialog extends JDialog {
 		ac.gridx = 0;
 		ac.insets = new Insets(4, 6, 4, 6);
 
-		// ---- AI Analysis enable panel ----
-		JPanel pnlAiEnable = new JPanel(new GridBagLayout());
-		pnlAiEnable.setBorder(BorderFactory.createTitledBorder("AI Analysis"));
-		GridBagConstraints ec = new GridBagConstraints();
-		ec.anchor = GridBagConstraints.WEST;
-		ec.insets = new Insets(4, 6, 4, 6);
-		ec.gridx = 0;
-		ec.gridy = 0;
+		// ---- Chat section ----
+		chkAiChatEnabled = new JCheckBox("Enable AI-powered Chat");
+		cmbAiChatProvider = new JComboBox<>(new String[]{ "Anthropic", "OpenAI", "Ollama" });
+		lblAiChatApiKey = new JLabel("API Key:");
+		txtAiChatApiKey = new JPasswordField(prefs.getAiChatApiKey(), 20);
+		lblAiChatEndpointUrl = new JLabel("Endpoint URL:");
+		txtAiChatEndpointUrl = new JTextField(prefs.getAiChatEndpointUrl(), 20);
+		cmbAiChatModel = new JComboBox<>();
+		spnAiChatMaxTokens = new JSpinner(new SpinnerNumberModel(
+				prefs.getAiChatMaxTokens(), 256, 32768, 256));
+		spnAiChatTemperature = new JSpinner(new SpinnerNumberModel(
+				prefs.getAiChatTemperature(), 0.0, 1.0, 0.1));
+		JSpinner.NumberEditor chatTempEditor = new JSpinner.NumberEditor(spnAiChatTemperature, "0.0");
+		spnAiChatTemperature.setEditor(chatTempEditor);
+		btnAiChatTest = new JButton("Test Chat Configuration");
+		lblAiChatTestResult = new JLabel(" ");
 
-		chkAiEnabled = new JCheckBox("Enable AI-powered TLS analysis");
-		chkAiEnabled.setSelected(prefs.isAiEnabled());
-		pnlAiEnable.add(chkAiEnabled, ec);
+		JPanel pnlChat = buildAiProviderSection("AI-powered Chat",
+				chkAiChatEnabled, cmbAiChatProvider, lblAiChatApiKey, txtAiChatApiKey,
+				lblAiChatEndpointUrl, txtAiChatEndpointUrl, cmbAiChatModel,
+				spnAiChatMaxTokens, spnAiChatTemperature, btnAiChatTest, lblAiChatTestResult,
+				prefs.getAiChatProvider(), prefs.getAiChatApiKey(), prefs.getAiChatEndpointUrl(),
+				prefs.getAiChatModel(), prefs.isAiChatEnabled());
 
 		ac.gridy = 0;
-		pnlConfig.add(pnlAiEnable, ac);
+		pnlConfig.add(pnlChat, ac);
 
-		// ---- Provider panel ----
-		JPanel pnlProvider = new JPanel(new GridBagLayout());
-		pnlProvider.setBorder(BorderFactory.createTitledBorder("Provider"));
-		GridBagConstraints pc = new GridBagConstraints();
-		pc.insets = new Insets(4, 6, 4, 6);
-		pc.anchor = GridBagConstraints.WEST;
-
-		pc.gridx = 0;
-		pc.gridy = 0;
-		pnlProvider.add(new JLabel("Provider:"), pc);
-
-		String[] providers = { "Anthropic", "OpenAI", "Ollama" };
-		cmbAiProvider = new JComboBox<>(providers);
-		cmbAiProvider.setSelectedItem(prefs.getAiProvider());
-		pc.gridx = 1;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.weightx = 1.0;
-		pnlProvider.add(cmbAiProvider, pc);
-
-		pc.gridx = 0;
-		pc.gridy = 1;
-		pc.fill = GridBagConstraints.NONE;
-		pc.weightx = 0;
-		lblAiApiKey = new JLabel("API Key:");
-		pnlProvider.add(lblAiApiKey, pc);
-
-		txtAiApiKey = new JPasswordField(prefs.getAiApiKey(), 20);
-		pc.gridx = 1;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.weightx = 1.0;
-		pnlProvider.add(txtAiApiKey, pc);
-
-		pc.gridx = 0;
-		pc.gridy = 2;
-		pc.fill = GridBagConstraints.NONE;
-		pc.weightx = 0;
-		lblAiEndpointUrl = new JLabel("Endpoint URL:");
-		pnlProvider.add(lblAiEndpointUrl, pc);
-
-		txtAiEndpointUrl = new JTextField(prefs.getAiEndpointUrl(), 20);
-		pc.gridx = 1;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.weightx = 1.0;
-		pnlProvider.add(txtAiEndpointUrl, pc);
-
-		// Set initial visibility based on provider
-		boolean isOllama = "Ollama".equalsIgnoreCase(prefs.getAiProvider());
-		lblAiApiKey.setVisible(!isOllama);
-		txtAiApiKey.setVisible(!isOllama);
-		lblAiEndpointUrl.setVisible(isOllama);
-		txtAiEndpointUrl.setVisible(isOllama);
-
-		pc.gridx = 0;
-		pc.gridy = 3;
-		pc.fill = GridBagConstraints.NONE;
-		pc.weightx = 0;
-		pnlProvider.add(new JLabel("Model:"), pc);
-
-		AiAnalysisService.Provider currentProvider = AiAnalysisService.Provider.fromDisplayName(
-				prefs.getAiProvider());
-		cmbAiModel = new JComboBox<>(AiAnalysisService.getModelsForProvider(currentProvider));
-		cmbAiModel.setEditable(true);
-		cmbAiModel.setSelectedItem(prefs.getAiModel());
-
-		// If Ollama is already selected on dialog open, fetch actual models from server
-		if (currentProvider == AiAnalysisService.Provider.OLLAMA) {
-			String savedModel = prefs.getAiModel();
-			new Thread(() -> {
-				String[] models = AiAnalysisService.fetchOllamaModels(prefs.getAiEndpointUrl());
-				javax.swing.SwingUtilities.invokeLater(() -> {
-					cmbAiModel.removeAllItems();
-					for (String m : models) {
-						cmbAiModel.addItem(m);
-					}
-					// Re-select saved model if still available
-					if (savedModel != null && !savedModel.isEmpty()) {
-						cmbAiModel.setSelectedItem(savedModel);
-					}
-				});
-			}, "ollama-model-fetch-init").start();
-		}
-
-		pc.gridx = 1;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.weightx = 1.0;
-		pnlProvider.add(cmbAiModel, pc);
-
-		pc.gridx = 0;
-		pc.gridy = 4;
-		pc.fill = GridBagConstraints.NONE;
-		pc.weightx = 0;
-		pnlProvider.add(new JLabel("Max Tokens:"), pc);
-
-		spnAiMaxTokens = new JSpinner(new SpinnerNumberModel(
+		// ---- Report section ----
+		chkAiReportEnabled = new JCheckBox("Enable AI-powered Reports");
+		cmbAiReportProvider = new JComboBox<>(new String[]{ "Anthropic", "OpenAI", "Ollama" });
+		lblAiReportApiKey = new JLabel("API Key:");
+		txtAiReportApiKey = new JPasswordField(prefs.getAiApiKey(), 20);
+		lblAiReportEndpointUrl = new JLabel("Endpoint URL:");
+		txtAiReportEndpointUrl = new JTextField(prefs.getAiEndpointUrl(), 20);
+		cmbAiReportModel = new JComboBox<>();
+		spnAiReportMaxTokens = new JSpinner(new SpinnerNumberModel(
 				prefs.getAiMaxTokens(), 256, 32768, 256));
-		pc.gridx = 1;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.weightx = 1.0;
-		pnlProvider.add(spnAiMaxTokens, pc);
-
-		pc.gridx = 0;
-		pc.gridy = 5;
-		pc.fill = GridBagConstraints.NONE;
-		pc.weightx = 0;
-		pnlProvider.add(new JLabel("Temperature:"), pc);
-
-		spnAiTemperature = new JSpinner(new SpinnerNumberModel(
+		spnAiReportTemperature = new JSpinner(new SpinnerNumberModel(
 				prefs.getAiTemperature(), 0.0, 1.0, 0.1));
-		JSpinner.NumberEditor tempEditor = new JSpinner.NumberEditor(spnAiTemperature, "0.0");
-		spnAiTemperature.setEditor(tempEditor);
-		pc.gridx = 1;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.weightx = 1.0;
-		pnlProvider.add(spnAiTemperature, pc);
+		JSpinner.NumberEditor reportTempEditor = new JSpinner.NumberEditor(spnAiReportTemperature, "0.0");
+		spnAiReportTemperature.setEditor(reportTempEditor);
+		btnAiReportTest = new JButton("Test Report Configuration");
+		lblAiReportTestResult = new JLabel(" ");
+
+		JPanel pnlReport = buildAiProviderSection("AI-powered Reports",
+				chkAiReportEnabled, cmbAiReportProvider, lblAiReportApiKey, txtAiReportApiKey,
+				lblAiReportEndpointUrl, txtAiReportEndpointUrl, cmbAiReportModel,
+				spnAiReportMaxTokens, spnAiReportTemperature, btnAiReportTest, lblAiReportTestResult,
+				prefs.getAiProvider(), prefs.getAiApiKey(), prefs.getAiEndpointUrl(),
+				prefs.getAiModel(), prefs.isAiReportEnabled());
 
 		ac.gridy = 1;
-		pnlConfig.add(pnlProvider, ac);
-
-		// ---- Test panel ----
-		JPanel pnlTest = new JPanel(new GridBagLayout());
-		pnlTest.setBorder(BorderFactory.createTitledBorder("Connection Test"));
-		GridBagConstraints btc = new GridBagConstraints();
-		btc.insets = new Insets(4, 6, 4, 6);
-		btc.anchor = GridBagConstraints.WEST;
-
-		btnAiTest = new JButton("Test Configuration");
-		btc.gridx = 0;
-		btc.gridy = 0;
-		pnlTest.add(btnAiTest, btc);
-
-		lblAiTestResult = new JLabel(" ");
-		btc.gridx = 1;
-		btc.fill = GridBagConstraints.HORIZONTAL;
-		btc.weightx = 1.0;
-		pnlTest.add(lblAiTestResult, btc);
-
-		ac.gridy = 2;
-		pnlConfig.add(pnlTest, ac);
+		pnlConfig.add(pnlReport, ac);
 
 		// ---- Info label ----
 		JLabel lblInfo = new JLabel(
-				"<html>API keys are stored locally in ~/DeepVioletTools/deepviolet.properties</html>");
+				"<html>Encrypted AI keys stored locally in ~/DeepVioletTools/deepviolet.properties</html>");
 		lblInfo.setFont(lblInfo.getFont().deriveFont(Font.PLAIN,
 				lblInfo.getFont().getSize() - 1f));
-		ac.gridy = 3;
+		ac.gridy = 2;
 		pnlConfig.add(lblInfo, ac);
 
 		// Spacer to push content to top
-		ac.gridy = 4;
+		ac.gridy = 3;
 		ac.weighty = 1.0;
 		pnlConfig.add(new JPanel(), ac);
 
@@ -1361,46 +1275,35 @@ public class FontChooserDialog extends JDialog {
 		aiSubTabs.addTab("Terminal Colors", splitColors);
 
 		// ============ Listeners ============
-		boolean aiEnabled = prefs.isAiEnabled();
-		setAiControlsEnabled(aiEnabled);
+		// Chat section listeners
+		setSectionControlsEnabled(chkAiChatEnabled.isSelected(),
+				cmbAiChatProvider, txtAiChatApiKey, txtAiChatEndpointUrl,
+				cmbAiChatModel, spnAiChatMaxTokens, spnAiChatTemperature, btnAiChatTest);
+		chkAiChatEnabled.addActionListener(e -> setSectionControlsEnabled(
+				chkAiChatEnabled.isSelected(),
+				cmbAiChatProvider, txtAiChatApiKey, txtAiChatEndpointUrl,
+				cmbAiChatModel, spnAiChatMaxTokens, spnAiChatTemperature, btnAiChatTest));
+		wireProviderListener(cmbAiChatProvider, lblAiChatApiKey, txtAiChatApiKey,
+				lblAiChatEndpointUrl, txtAiChatEndpointUrl, cmbAiChatModel, "chat");
+		btnAiChatTest.addActionListener(e -> runAiConnectionTest(
+				txtAiChatApiKey, cmbAiChatProvider, cmbAiChatModel,
+				txtAiChatEndpointUrl, btnAiChatTest, lblAiChatTestResult, chkAiChatEnabled));
 
-		chkAiEnabled.addActionListener(e -> {
-			boolean enabled = chkAiEnabled.isSelected();
-			setAiControlsEnabled(enabled);
+		// Report section listeners
+		setSectionControlsEnabled(chkAiReportEnabled.isSelected(),
+				cmbAiReportProvider, txtAiReportApiKey, txtAiReportEndpointUrl,
+				cmbAiReportModel, spnAiReportMaxTokens, spnAiReportTemperature, btnAiReportTest);
+		chkAiReportEnabled.addActionListener(e -> {
+			setSectionControlsEnabled(chkAiReportEnabled.isSelected(),
+					cmbAiReportProvider, txtAiReportApiKey, txtAiReportEndpointUrl,
+					cmbAiReportModel, spnAiReportMaxTokens, spnAiReportTemperature, btnAiReportTest);
 			updateAiEvaluationCheckbox();
 		});
-
-		cmbAiProvider.addActionListener(e -> {
-			String selected = (String) cmbAiProvider.getSelectedItem();
-			AiAnalysisService.Provider p = AiAnalysisService.Provider.fromDisplayName(selected);
-			boolean ollama = (p == AiAnalysisService.Provider.OLLAMA);
-			lblAiApiKey.setVisible(!ollama);
-			txtAiApiKey.setVisible(!ollama);
-			lblAiEndpointUrl.setVisible(ollama);
-			txtAiEndpointUrl.setVisible(ollama);
-			if (ollama) {
-				// Fetch models async to avoid blocking EDT
-				new Thread(() -> {
-					String[] models = AiAnalysisService.fetchOllamaModels(txtAiEndpointUrl.getText());
-					javax.swing.SwingUtilities.invokeLater(() -> {
-						cmbAiModel.removeAllItems();
-						for (String m : models) {
-							cmbAiModel.addItem(m);
-						}
-					});
-				}, "ollama-model-fetch").start();
-			} else {
-				String[] models = AiAnalysisService.getModelsForProvider(p);
-				cmbAiModel.removeAllItems();
-				for (String m : models) {
-					cmbAiModel.addItem(m);
-				}
-			}
-			// Update AI evaluation checkbox enablement
-			updateAiEvaluationCheckbox();
-		});
-
-		btnAiTest.addActionListener(e -> runAiConnectionTest());
+		wireProviderListener(cmbAiReportProvider, lblAiReportApiKey, txtAiReportApiKey,
+				lblAiReportEndpointUrl, txtAiReportEndpointUrl, cmbAiReportModel, "report");
+		btnAiReportTest.addActionListener(e -> runAiConnectionTest(
+				txtAiReportApiKey, cmbAiReportProvider, cmbAiReportModel,
+				txtAiReportEndpointUrl, btnAiReportTest, lblAiReportTestResult, chkAiReportEnabled));
 
 		btnAiTermBg.addActionListener(e -> pickColor(btnAiTermBg, "Terminal Background"));
 		btnAiTermUserPrefix.addActionListener(e -> pickColor(btnAiTermUserPrefix, "User Prefix Color"));
@@ -1418,23 +1321,169 @@ public class FontChooserDialog extends JDialog {
 		return wrapper;
 	}
 
-	private void setAiControlsEnabled(boolean enabled) {
-		cmbAiProvider.setEnabled(enabled);
-		txtAiApiKey.setEnabled(enabled);
-		txtAiEndpointUrl.setEnabled(enabled);
-		cmbAiModel.setEnabled(enabled);
-		spnAiMaxTokens.setEnabled(enabled);
-		spnAiTemperature.setEnabled(enabled);
-		txtAiSystemPrompt.setEnabled(enabled);
-		txtAiChatSystemPrompt.setEnabled(enabled);
-		btnAiTest.setEnabled(enabled);
+	/**
+	 * Build one AI provider section panel (used for both Chat and Report).
+	 */
+	private JPanel buildAiProviderSection(String title,
+			JCheckBox chk, JComboBox<String> cmbProvider,
+			JLabel lblKey, JPasswordField txtKey,
+			JLabel lblEndpoint, JTextField txtEndpoint,
+			JComboBox<String> cmbModel,
+			JSpinner spnTokens, JSpinner spnTemp,
+			JButton btnTest, JLabel lblResult,
+			String savedProvider, String savedApiKey, String savedEndpoint,
+			String savedModel, boolean savedEnabled) {
+
+		JPanel section = new JPanel(new GridBagLayout());
+		section.setBorder(BorderFactory.createTitledBorder(title));
+		GridBagConstraints pc = new GridBagConstraints();
+		pc.insets = new Insets(3, 6, 3, 6);
+		pc.anchor = GridBagConstraints.WEST;
+
+		// Row 0: Checkbox
+		pc.gridx = 0; pc.gridy = 0; pc.gridwidth = 4;
+		chk.setSelected(savedEnabled);
+		section.add(chk, pc);
+		pc.gridwidth = 1;
+
+		// Row 1: Provider
+		pc.gridx = 0; pc.gridy = 1;
+		section.add(new JLabel("Provider:"), pc);
+		cmbProvider.setSelectedItem(savedProvider);
+		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		section.add(cmbProvider, pc);
+		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+
+		// Row 2: API Key / Endpoint
+		pc.gridx = 0; pc.gridy = 2;
+		section.add(lblKey, pc);
+		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		section.add(txtKey, pc);
+		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+
+		pc.gridx = 0; pc.gridy = 3;
+		section.add(lblEndpoint, pc);
+		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		section.add(txtEndpoint, pc);
+		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+
+		boolean isOllama = "Ollama".equalsIgnoreCase(savedProvider);
+		lblKey.setVisible(!isOllama);
+		txtKey.setVisible(!isOllama);
+		lblEndpoint.setVisible(isOllama);
+		txtEndpoint.setVisible(isOllama);
+
+		// Row 4: Model
+		pc.gridx = 0; pc.gridy = 4; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+		section.add(new JLabel("Model:"), pc);
+
+		AiAnalysisService.Provider currentProvider = AiAnalysisService.Provider.fromDisplayName(savedProvider);
+		String[] defaultModels = AiAnalysisService.getModelsForProvider(currentProvider);
+		for (String m : defaultModels) cmbModel.addItem(m);
+		cmbModel.setSelectedItem(savedModel);
+
+		// Fetch actual models from provider on dialog open
+		{
+			String threadPrefix = title.contains("Chat") ? "chat" : "report";
+			String threadName;
+			java.util.function.Supplier<String[]> fetcher;
+			if (currentProvider == AiAnalysisService.Provider.OLLAMA) {
+				threadName = threadPrefix + "-ollama-model-fetch-init";
+				fetcher = () -> AiAnalysisService.fetchOllamaModels(savedEndpoint);
+			} else if (currentProvider == AiAnalysisService.Provider.ANTHROPIC) {
+				threadName = threadPrefix + "-anthropic-model-fetch-init";
+				fetcher = () -> AiAnalysisService.fetchAnthropicModels(savedApiKey);
+			} else {
+				threadName = threadPrefix + "-openai-model-fetch-init";
+				fetcher = () -> AiAnalysisService.fetchOpenAIModels(savedApiKey);
+			}
+			new Thread(() -> {
+				String[] models = fetcher.get();
+				javax.swing.SwingUtilities.invokeLater(() -> {
+					cmbModel.removeAllItems();
+					for (String m : models) cmbModel.addItem(m);
+					if (savedModel != null && !savedModel.isEmpty()) {
+						cmbModel.setSelectedItem(savedModel);
+					}
+				});
+			}, threadName).start();
+		}
+
+		pc.gridx = 1;
+		section.add(cmbModel, pc);
+
+		// Row 5: Max Tokens + Temperature side by side
+		pc.gridx = 0; pc.gridy = 5;
+		section.add(new JLabel("Max Tokens:"), pc);
+		pc.gridx = 1;
+		section.add(spnTokens, pc);
+
+		pc.gridx = 2;
+		section.add(new JLabel("Temperature:"), pc);
+		pc.gridx = 3;
+		section.add(spnTemp, pc);
+
+		// Row 6: Test button and result
+		pc.gridx = 0; pc.gridy = 6;
+		section.add(btnTest, pc);
+		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		section.add(lblResult, pc);
+		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+
+		return section;
+	}
+
+	private void setSectionControlsEnabled(boolean enabled,
+			JComboBox<String> cmbProvider, JPasswordField txtKey, JTextField txtEndpoint,
+			JComboBox<String> cmbModel, JSpinner spnTokens, JSpinner spnTemp, JButton btnTest) {
+		cmbProvider.setEnabled(enabled);
+		txtKey.setEnabled(enabled);
+		txtEndpoint.setEnabled(enabled);
+		cmbModel.setEnabled(enabled);
+		spnTokens.setEnabled(enabled);
+		spnTemp.setEnabled(enabled);
+		btnTest.setEnabled(enabled);
+	}
+
+	private void wireProviderListener(JComboBox<String> cmbProvider,
+			JLabel lblKey, JPasswordField txtKey,
+			JLabel lblEndpoint, JTextField txtEndpoint,
+			JComboBox<String> cmbModel, String section) {
+		cmbProvider.addActionListener(e -> {
+			String selected = (String) cmbProvider.getSelectedItem();
+			AiAnalysisService.Provider p = AiAnalysisService.Provider.fromDisplayName(selected);
+			boolean ollama = (p == AiAnalysisService.Provider.OLLAMA);
+			lblKey.setVisible(!ollama);
+			txtKey.setVisible(!ollama);
+			lblEndpoint.setVisible(ollama);
+			txtEndpoint.setVisible(ollama);
+			String threadName = section + "-" + selected.toLowerCase() + "-model-fetch";
+			java.util.function.Supplier<String[]> fetcher;
+			if (ollama) {
+				fetcher = () -> AiAnalysisService.fetchOllamaModels(txtEndpoint.getText());
+			} else if (p == AiAnalysisService.Provider.ANTHROPIC) {
+				fetcher = () -> AiAnalysisService.fetchAnthropicModels(new String(txtKey.getPassword()));
+			} else {
+				fetcher = () -> AiAnalysisService.fetchOpenAIModels(new String(txtKey.getPassword()));
+			}
+			new Thread(() -> {
+				String[] models = fetcher.get();
+				javax.swing.SwingUtilities.invokeLater(() -> {
+					cmbModel.removeAllItems();
+					for (String m : models) cmbModel.addItem(m);
+				});
+			}, threadName).start();
+			if ("report".equals(section)) {
+				updateAiEvaluationCheckbox();
+			}
+		});
 	}
 
 	private void updateAiEvaluationCheckbox() {
-		boolean enabled = chkAiEnabled.isSelected();
-		String provider = (String) cmbAiProvider.getSelectedItem();
+		boolean enabled = chkAiReportEnabled.isSelected();
+		String provider = (String) cmbAiReportProvider.getSelectedItem();
 		boolean isOllama = "Ollama".equalsIgnoreCase(provider);
-		boolean hasKey = txtAiApiKey.getPassword().length > 0;
+		boolean hasKey = txtAiReportApiKey.getPassword().length > 0;
 		if (enabled && (isOllama || hasKey)) {
 			chkAiEvaluation.setEnabled(true);
 			chkAiEvaluation.setSelected(true);
@@ -1444,24 +1493,25 @@ public class FontChooserDialog extends JDialog {
 		}
 	}
 
-	private void runAiConnectionTest() {
-		String apiKey = new String(txtAiApiKey.getPassword());
-		String provider = (String) cmbAiProvider.getSelectedItem();
-		String model = (String) cmbAiModel.getSelectedItem();
-		String endpointUrl = txtAiEndpointUrl.getText();
+	private void runAiConnectionTest(JPasswordField txtKey, JComboBox<String> cmbProvider,
+			JComboBox<String> cmbModel, JTextField txtEndpoint,
+			JButton btnTest, JLabel lblResult, JCheckBox chkEnabled) {
+		String apiKey = new String(txtKey.getPassword());
+		String provider = (String) cmbProvider.getSelectedItem();
+		String model = (String) cmbModel.getSelectedItem();
+		String endpointUrl = txtEndpoint.getText();
 		boolean isOllama = "Ollama".equalsIgnoreCase(provider);
 
 		if (!isOllama && apiKey.isBlank()) {
-			lblAiTestResult.setForeground(java.awt.Color.RED);
-			lblAiTestResult.setText("API key is required");
+			lblResult.setForeground(java.awt.Color.RED);
+			lblResult.setText("API key is required");
 			return;
 		}
 
-		btnAiTest.setEnabled(false);
-		lblAiTestResult.setForeground(java.awt.Color.GRAY);
-		lblAiTestResult.setText("Testing...");
+		btnTest.setEnabled(false);
+		lblResult.setForeground(java.awt.Color.GRAY);
+		lblResult.setText("Testing...");
 
-		// Run on background thread to avoid blocking EDT
 		new Thread(() -> {
 			try {
 				AiAnalysisService service = new AiAnalysisService();
@@ -1473,20 +1523,20 @@ public class FontChooserDialog extends JDialog {
 
 				boolean ok = response.toLowerCase().contains("operational");
 				javax.swing.SwingUtilities.invokeLater(() -> {
-					btnAiTest.setEnabled(chkAiEnabled.isSelected());
+					btnTest.setEnabled(chkEnabled.isSelected());
 					if (ok) {
-						lblAiTestResult.setForeground(new java.awt.Color(0x1A, 0x7F, 0x37));
-						lblAiTestResult.setText("Connected - " + provider + " / " + model);
+						lblResult.setForeground(new java.awt.Color(0x1A, 0x7F, 0x37));
+						lblResult.setText("Connected - " + provider + " / " + model);
 					} else {
-						lblAiTestResult.setForeground(java.awt.Color.ORANGE);
-						lblAiTestResult.setText("Unexpected response: " + response.substring(0, Math.min(60, response.length())));
+						lblResult.setForeground(java.awt.Color.ORANGE);
+						lblResult.setText("Unexpected response: " + response.substring(0, Math.min(60, response.length())));
 					}
 				});
 			} catch (AiAnalysisService.AiAnalysisException ex) {
 				javax.swing.SwingUtilities.invokeLater(() -> {
-					btnAiTest.setEnabled(chkAiEnabled.isSelected());
-					lblAiTestResult.setForeground(java.awt.Color.RED);
-					lblAiTestResult.setText("Failed: " + ex.getMessage());
+					btnTest.setEnabled(chkEnabled.isSelected());
+					lblResult.setForeground(java.awt.Color.RED);
+					lblResult.setText("Failed: " + ex.getMessage());
 				});
 			}
 		}, "ai-config-test").start();
@@ -2016,7 +2066,8 @@ public class FontChooserDialog extends JDialog {
 		if (prefs.isProtocolTls13() != originalPrefs.isProtocolTls13()) return true;
 		if (prefs.getWorkerThreads() != originalPrefs.getWorkerThreads()) return true;
 		// Compare AI settings
-		if (prefs.isAiEnabled() != originalPrefs.isAiEnabled()) return true;
+		if (prefs.isAiReportEnabled() != originalPrefs.isAiReportEnabled()) return true;
+		if (prefs.isAiChatEnabled() != originalPrefs.isAiChatEnabled()) return true;
 		if (!prefs.getAiProvider().equals(originalPrefs.getAiProvider())) return true;
 		// Compare app theme
 		if (prefs.isAppThemeCustom() != originalPrefs.isAppThemeCustom()) return true;
@@ -2137,14 +2188,25 @@ public class FontChooserDialog extends JDialog {
 			prefs.setUserRiskRulesEnabled(chkUserRiskRulesEnabled.isSelected());
 		}
 
-		// AI settings
-		prefs.setAiEnabled(chkAiEnabled.isSelected());
-		prefs.setAiProvider((String) cmbAiProvider.getSelectedItem());
-		prefs.setAiApiKey(new String(txtAiApiKey.getPassword()));
-		prefs.setAiEndpointUrl(txtAiEndpointUrl.getText());
-		prefs.setAiModel((String) cmbAiModel.getSelectedItem());
-		prefs.setAiMaxTokens((Integer) spnAiMaxTokens.getValue());
-		prefs.setAiTemperature((Double) spnAiTemperature.getValue());
+		// AI chat settings
+		prefs.setAiChatEnabled(chkAiChatEnabled.isSelected());
+		prefs.setAiChatProvider((String) cmbAiChatProvider.getSelectedItem());
+		prefs.setAiChatApiKey(new String(txtAiChatApiKey.getPassword()));
+		prefs.setAiChatEndpointUrl(txtAiChatEndpointUrl.getText());
+		prefs.setAiChatModel((String) cmbAiChatModel.getSelectedItem());
+		prefs.setAiChatMaxTokens((Integer) spnAiChatMaxTokens.getValue());
+		prefs.setAiChatTemperature((Double) spnAiChatTemperature.getValue());
+
+		// AI report settings
+		prefs.setAiReportEnabled(chkAiReportEnabled.isSelected());
+		prefs.setAiProvider((String) cmbAiReportProvider.getSelectedItem());
+		prefs.setAiApiKey(new String(txtAiReportApiKey.getPassword()));
+		prefs.setAiEndpointUrl(txtAiReportEndpointUrl.getText());
+		prefs.setAiModel((String) cmbAiReportModel.getSelectedItem());
+		prefs.setAiMaxTokens((Integer) spnAiReportMaxTokens.getValue());
+		prefs.setAiTemperature((Double) spnAiReportTemperature.getValue());
+
+		// AI prompts
 		prefs.setAiSystemPrompt(txtAiSystemPrompt.getText());
 		prefs.setAiChatSystemPrompt(txtAiChatSystemPrompt.getText());
 	}
@@ -2383,8 +2445,8 @@ public class FontChooserDialog extends JDialog {
 		copy.setAppForeground(src.getAppForeground());
 		copy.setAppButtonBg(src.getAppButtonBg());
 		copy.setAppButtonFg(src.getAppButtonFg());
-		// AI settings
-		copy.setAiEnabled(src.isAiEnabled());
+		// AI report settings
+		copy.setAiReportEnabled(src.isAiReportEnabled());
 		copy.setAiProvider(src.getAiProvider());
 		copy.setAiApiKey(src.getAiApiKey());
 		copy.setAiEndpointUrl(src.getAiEndpointUrl());
@@ -2393,6 +2455,14 @@ public class FontChooserDialog extends JDialog {
 		copy.setAiTemperature(src.getAiTemperature());
 		copy.setAiSystemPrompt(src.getAiSystemPrompt());
 		copy.setAiChatSystemPrompt(src.getAiChatSystemPrompt());
+		// AI chat settings
+		copy.setAiChatEnabled(src.isAiChatEnabled());
+		copy.setAiChatProvider(src.getAiChatProvider());
+		copy.setAiChatApiKey(src.getAiChatApiKey());
+		copy.setAiChatEndpointUrl(src.getAiChatEndpointUrl());
+		copy.setAiChatModel(src.getAiChatModel());
+		copy.setAiChatMaxTokens(src.getAiChatMaxTokens());
+		copy.setAiChatTemperature(src.getAiChatTemperature());
 		// AI terminal colors
 		copy.setAiTerminalBg(src.getAiTerminalBg());
 		copy.setAiTerminalUserPrefix(src.getAiTerminalUserPrefix());

@@ -333,7 +333,7 @@ public class FontPreferences {
 	private static final int GCM_IV_BYTES = 12;
 	private static final int GCM_TAG_BITS = 128;
 
-	// AI configuration keys
+	// AI report configuration keys (existing — backward compatible)
 	private static final String KEY_AI_ENABLED = "ai.enabled";
 	private static final String KEY_AI_PROVIDER = "ai.provider";
 	private static final String KEY_AI_API_KEY = "ai.apiKey";
@@ -344,6 +344,15 @@ public class FontPreferences {
 	private static final String KEY_AI_CHAT_SYSTEM_PROMPT = "ai.chatSystemPrompt";
 	private static final String KEY_AI_ENDPOINT_URL = "ai.endpointUrl";
 	private static final String KEY_SECTION_AI_EVALUATION = "engine.section.aiEvaluation";
+
+	// AI chat configuration keys
+	private static final String KEY_AI_CHAT_ENABLED = "ai.chat.enabled";
+	private static final String KEY_AI_CHAT_PROVIDER = "ai.chat.provider";
+	private static final String KEY_AI_CHAT_API_KEY = "ai.chat.apiKey";
+	private static final String KEY_AI_CHAT_MODEL = "ai.chat.model";
+	private static final String KEY_AI_CHAT_MAX_TOKENS = "ai.chat.maxTokens";
+	private static final String KEY_AI_CHAT_TEMPERATURE = "ai.chat.temperature";
+	private static final String KEY_AI_CHAT_ENDPOINT_URL = "ai.chat.endpointUrl";
 
 	// AI terminal color keys
 	private static final String KEY_AI_TERMINAL_BG = "ai.terminal.background";
@@ -497,8 +506,8 @@ public class FontPreferences {
 	private long throttleDelayMs = 150;
 	private int maxCidrExpansion = TargetParser.DEFAULT_MAX_CIDR_EXPANSION;
 
-	// AI configuration fields
-	private boolean aiEnabled = false;
+	// AI report configuration fields
+	private boolean aiReportEnabled = false;
 	private String aiProvider = "Anthropic";
 	private String aiApiKey = "";
 	private String aiModel = "claude-sonnet-4-5-20250929";
@@ -508,6 +517,15 @@ public class FontPreferences {
 	private String aiChatSystemPrompt = AiAnalysisService.DEFAULT_CHAT_SYSTEM_PROMPT;
 	private String aiEndpointUrl = AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
 	private boolean sectionAiEvaluation = false;
+
+	// AI chat configuration fields
+	private boolean aiChatEnabled = false;
+	private String aiChatProvider = "Anthropic";
+	private String aiChatApiKey = "";
+	private String aiChatModel = "claude-sonnet-4-5-20250929";
+	private int aiChatMaxTokens = 4096;
+	private double aiChatTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
+	private String aiChatEndpointUrl = AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
 
 	// AI terminal color fields
 	private Color aiTerminalBg = DEFAULT_AI_TERMINAL_BG;
@@ -655,10 +673,10 @@ public class FontPreferences {
 			fp.maxCidrExpansion = TargetParser.DEFAULT_MAX_CIDR_EXPANSION;
 		}
 
-		// AI configuration
-		fp.aiEnabled = "true".equalsIgnoreCase(props.getProperty(KEY_AI_ENABLED, "false"));
+		// AI report configuration
+		fp.aiReportEnabled = "true".equalsIgnoreCase(props.getProperty(KEY_AI_ENABLED, "false"));
 		fp.aiProvider = props.getProperty(KEY_AI_PROVIDER, "Anthropic");
-		fp.aiApiKey = decryptApiKey(props);
+		fp.aiApiKey = decryptApiKey(props, KEY_AI_API_KEY);
 		fp.aiModel = props.getProperty(KEY_AI_MODEL, "claude-sonnet-4-5-20250929");
 		try {
 			fp.aiMaxTokens = Integer.parseInt(props.getProperty(KEY_AI_MAX_TOKENS, "4096"));
@@ -684,6 +702,39 @@ public class FontPreferences {
 				AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT);
 		fp.sectionAiEvaluation = "true".equalsIgnoreCase(
 				props.getProperty(KEY_SECTION_AI_EVALUATION, "false"));
+
+		// AI chat configuration
+		fp.aiChatProvider = props.getProperty(KEY_AI_CHAT_PROVIDER, "Anthropic");
+		fp.aiChatApiKey = decryptApiKey(props, KEY_AI_CHAT_API_KEY);
+		fp.aiChatModel = props.getProperty(KEY_AI_CHAT_MODEL, "claude-sonnet-4-5-20250929");
+		try {
+			fp.aiChatMaxTokens = Integer.parseInt(props.getProperty(KEY_AI_CHAT_MAX_TOKENS, "4096"));
+		} catch (NumberFormatException e) {
+			fp.aiChatMaxTokens = 4096;
+		}
+		try {
+			fp.aiChatTemperature = Double.parseDouble(props.getProperty(KEY_AI_CHAT_TEMPERATURE,
+					String.valueOf(AiAnalysisService.DEFAULT_TEMPERATURE)));
+		} catch (NumberFormatException e) {
+			fp.aiChatTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
+		}
+		fp.aiChatEndpointUrl = props.getProperty(KEY_AI_CHAT_ENDPOINT_URL,
+				AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT);
+		// Migration: if chat keys absent but report AI was enabled, enable chat too
+		if (props.getProperty(KEY_AI_CHAT_ENABLED) == null) {
+			fp.aiChatEnabled = fp.aiReportEnabled;
+			// Copy report config as initial chat config for existing users
+			if (fp.aiChatEnabled) {
+				fp.aiChatProvider = fp.aiProvider;
+				fp.aiChatApiKey = fp.aiApiKey;
+				fp.aiChatModel = fp.aiModel;
+				fp.aiChatMaxTokens = fp.aiMaxTokens;
+				fp.aiChatTemperature = fp.aiTemperature;
+				fp.aiChatEndpointUrl = fp.aiEndpointUrl;
+			}
+		} else {
+			fp.aiChatEnabled = "true".equalsIgnoreCase(props.getProperty(KEY_AI_CHAT_ENABLED, "false"));
+		}
 
 		// AI terminal colors
 		fp.aiTerminalBg = readColor(props, KEY_AI_TERMINAL_BG, DEFAULT_AI_TERMINAL_BG);
@@ -840,10 +891,10 @@ public class FontPreferences {
 		props.setProperty(KEY_THROTTLE_DELAY_MS, String.valueOf(fp.throttleDelayMs));
 		props.setProperty(KEY_MAX_CIDR_EXPANSION, String.valueOf(fp.maxCidrExpansion));
 
-		// AI configuration
-		props.setProperty(KEY_AI_ENABLED, String.valueOf(fp.aiEnabled));
+		// AI report configuration
+		props.setProperty(KEY_AI_ENABLED, String.valueOf(fp.aiReportEnabled));
 		props.setProperty(KEY_AI_PROVIDER, fp.aiProvider);
-		encryptApiKey(props, fp.aiApiKey);
+		encryptApiKey(props, KEY_AI_API_KEY, fp.aiApiKey);
 		props.setProperty(KEY_AI_MODEL, fp.aiModel);
 		props.setProperty(KEY_AI_MAX_TOKENS, String.valueOf(fp.aiMaxTokens));
 		props.setProperty(KEY_AI_TEMPERATURE, String.valueOf(fp.aiTemperature));
@@ -851,6 +902,15 @@ public class FontPreferences {
 		props.setProperty(KEY_AI_CHAT_SYSTEM_PROMPT, fp.aiChatSystemPrompt);
 		props.setProperty(KEY_AI_ENDPOINT_URL, fp.aiEndpointUrl);
 		props.setProperty(KEY_SECTION_AI_EVALUATION, String.valueOf(fp.sectionAiEvaluation));
+
+		// AI chat configuration
+		props.setProperty(KEY_AI_CHAT_ENABLED, String.valueOf(fp.aiChatEnabled));
+		props.setProperty(KEY_AI_CHAT_PROVIDER, fp.aiChatProvider);
+		encryptApiKey(props, KEY_AI_CHAT_API_KEY, fp.aiChatApiKey);
+		props.setProperty(KEY_AI_CHAT_MODEL, fp.aiChatModel);
+		props.setProperty(KEY_AI_CHAT_MAX_TOKENS, String.valueOf(fp.aiChatMaxTokens));
+		props.setProperty(KEY_AI_CHAT_TEMPERATURE, String.valueOf(fp.aiChatTemperature));
+		props.setProperty(KEY_AI_CHAT_ENDPOINT_URL, fp.aiChatEndpointUrl);
 
 		// AI terminal colors
 		props.setProperty(KEY_AI_TERMINAL_BG, encodeColor(fp.aiTerminalBg));
@@ -1880,17 +1940,17 @@ public class FontPreferences {
 	public int getScanHardwrapWidth() { return hardwrapWidth; }
 	public void setScanHardwrapWidth(int v) { this.hardwrapWidth = v; }
 
-	// ---- AI configuration accessors ----
+	// ---- AI report configuration accessors ----
 
-	public boolean isAiEnabled() { return aiEnabled; }
-	public void setAiEnabled(boolean v) { this.aiEnabled = v; }
+	public boolean isAiReportEnabled() { return aiReportEnabled; }
+	public void setAiReportEnabled(boolean v) { this.aiReportEnabled = v; }
 
 	/**
-	 * Returns true if AI is enabled AND an API key is configured
+	 * Returns true if AI reports are enabled AND an API key is configured
 	 * (or the provider is Ollama, which doesn't require a key).
 	 */
-	public boolean isAiReady() {
-		if (!aiEnabled) return false;
+	public boolean isReportReady() {
+		if (!aiReportEnabled) return false;
 		if ("Ollama".equalsIgnoreCase(aiProvider)) return true;
 		return aiApiKey != null && !aiApiKey.isBlank();
 	}
@@ -1921,6 +1981,39 @@ public class FontPreferences {
 
 	public boolean isSectionAiEvaluation() { return sectionAiEvaluation; }
 	public void setSectionAiEvaluation(boolean v) { this.sectionAiEvaluation = v; }
+
+	// ---- AI chat configuration accessors ----
+
+	public boolean isAiChatEnabled() { return aiChatEnabled; }
+	public void setAiChatEnabled(boolean v) { this.aiChatEnabled = v; }
+
+	/**
+	 * Returns true if AI chat is enabled AND an API key is configured
+	 * (or the provider is Ollama, which doesn't require a key).
+	 */
+	public boolean isChatReady() {
+		if (!aiChatEnabled) return false;
+		if ("Ollama".equalsIgnoreCase(aiChatProvider)) return true;
+		return aiChatApiKey != null && !aiChatApiKey.isBlank();
+	}
+
+	public String getAiChatProvider() { return aiChatProvider; }
+	public void setAiChatProvider(String v) { this.aiChatProvider = v; }
+
+	public String getAiChatApiKey() { return aiChatApiKey; }
+	public void setAiChatApiKey(String v) { this.aiChatApiKey = v; }
+
+	public String getAiChatModel() { return aiChatModel; }
+	public void setAiChatModel(String v) { this.aiChatModel = v; }
+
+	public int getAiChatMaxTokens() { return aiChatMaxTokens; }
+	public void setAiChatMaxTokens(int v) { this.aiChatMaxTokens = v; }
+
+	public double getAiChatTemperature() { return aiChatTemperature; }
+	public void setAiChatTemperature(double v) { this.aiChatTemperature = v; }
+
+	public String getAiChatEndpointUrl() { return aiChatEndpointUrl; }
+	public void setAiChatEndpointUrl(String v) { this.aiChatEndpointUrl = v; }
 
 	// ---- AI terminal color accessors ----
 
@@ -2311,8 +2404,8 @@ public class FontPreferences {
 	 *   <li>Legacy plaintext — returns as-is (will be encrypted on next save)</li>
 	 * </ol>
 	 */
-	private static String decryptApiKey(Properties props) {
-		String stored = props.getProperty(KEY_AI_API_KEY, "");
+	private static String decryptApiKey(Properties props, String propKey) {
+		String stored = props.getProperty(propKey, "");
 		if (stored.isEmpty()) {
 			return "";
 		}
@@ -2340,26 +2433,26 @@ public class FontPreferences {
 	}
 
 	/**
-	 * Encrypt the API key and store it in the properties.
+	 * Encrypt the API key and store it in the properties under the given key.
 	 */
-	private static void encryptApiKey(Properties props, String apiKey) {
+	private static void encryptApiKey(Properties props, String propKey, String apiKey) {
 		if (apiKey == null || apiKey.isEmpty()) {
-			props.setProperty(KEY_AI_API_KEY, "");
+			props.setProperty(propKey, "");
 			return;
 		}
 		String seedB64 = loadGlobalProperties().getProperty(KEY_ENCRYPTION_SEED);
 		if (seedB64 == null) {
 			// No seed — store plaintext (will be encrypted after seed is created)
-			props.setProperty(KEY_AI_API_KEY, apiKey);
+			props.setProperty(propKey, apiKey);
 			return;
 		}
 		try {
 			byte[] seed = Base64.getDecoder().decode(seedB64);
 			byte[] encrypted = encrypt(apiKey, seed);
-			props.setProperty(KEY_AI_API_KEY, Base64.getEncoder().encodeToString(encrypted));
+			props.setProperty(propKey, Base64.getEncoder().encodeToString(encrypted));
 		} catch (Exception e) {
 			logger.error("Failed to encrypt API key", e);
-			props.setProperty(KEY_AI_API_KEY, apiKey);
+			props.setProperty(propKey, apiKey);
 		}
 	}
 

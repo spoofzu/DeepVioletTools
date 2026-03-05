@@ -8,6 +8,8 @@ import java.time.Duration;
 
 import java.util.List;
 
+import com.mps.deepviolettools.model.ScanNode;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -26,6 +28,9 @@ public class AiAnalysisService {
 
 	private static final Logger logger = LoggerFactory
 			.getLogger("com.mps.deepviolettools.util.AiAnalysisService");
+
+	private static final Logger aiReportLog = LoggerFactory
+			.getLogger("aiinlinereporting");
 
 	private static final HttpClient httpClient = HttpClient.newBuilder()
 			.connectTimeout(Duration.ofSeconds(30))
@@ -123,6 +128,103 @@ public class AiAnalysisService {
 		return OLLAMA_MODELS;
 	}
 
+	/**
+	 * Fetch available models from the Anthropic API via GET /v1/models.
+	 * Falls back to {@link #ANTHROPIC_MODELS} on failure.
+	 *
+	 * @param apiKey Anthropic API key
+	 * @return array of model IDs
+	 */
+	public static String[] fetchAnthropicModels(String apiKey) {
+		if (apiKey == null || apiKey.isBlank()) {
+			return ANTHROPIC_MODELS;
+		}
+		try {
+			HttpRequest request = HttpRequest.newBuilder()
+					.uri(URI.create("https://api.anthropic.com/v1/models"))
+					.header("x-api-key", apiKey)
+					.header("anthropic-version", "2023-06-01")
+					.timeout(Duration.ofSeconds(10))
+					.GET()
+					.build();
+
+			HttpResponse<String> response = httpClient.send(request,
+					HttpResponse.BodyHandlers.ofString());
+
+			if (response.statusCode() == 200) {
+				JsonNode root = mapper.readTree(response.body());
+				JsonNode data = root.path("data");
+				if (data.isArray() && !data.isEmpty()) {
+					java.util.List<String> ids = new java.util.ArrayList<>();
+					for (JsonNode model : data) {
+						String id = model.path("id").asText("");
+						if (!id.isEmpty()) {
+							ids.add(id);
+						}
+					}
+					if (!ids.isEmpty()) {
+						java.util.Collections.sort(ids);
+						return ids.toArray(new String[0]);
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.debug("Failed to fetch Anthropic models, using defaults", e);
+		}
+		return ANTHROPIC_MODELS;
+	}
+
+	/**
+	 * Fetch available chat models from the OpenAI API via GET /v1/models.
+	 * Filters to chat-capable models (gpt-*, o1*, o3*, o4-mini*, chatgpt-*).
+	 * Falls back to {@link #OPENAI_MODELS} on failure.
+	 *
+	 * @param apiKey OpenAI API key
+	 * @return array of model IDs
+	 */
+	public static String[] fetchOpenAIModels(String apiKey) {
+		if (apiKey == null || apiKey.isBlank()) {
+			return OPENAI_MODELS;
+		}
+		try {
+			HttpRequest request = HttpRequest.newBuilder()
+					.uri(URI.create("https://api.openai.com/v1/models"))
+					.header("Authorization", "Bearer " + apiKey)
+					.timeout(Duration.ofSeconds(10))
+					.GET()
+					.build();
+
+			HttpResponse<String> response = httpClient.send(request,
+					HttpResponse.BodyHandlers.ofString());
+
+			if (response.statusCode() == 200) {
+				JsonNode root = mapper.readTree(response.body());
+				JsonNode data = root.path("data");
+				if (data.isArray() && !data.isEmpty()) {
+					java.util.List<String> ids = new java.util.ArrayList<>();
+					for (JsonNode model : data) {
+						String id = model.path("id").asText("");
+						if (!id.isEmpty() && isChatModel(id)) {
+							ids.add(id);
+						}
+					}
+					if (!ids.isEmpty()) {
+						java.util.Collections.sort(ids);
+						return ids.toArray(new String[0]);
+					}
+				}
+			}
+		} catch (Exception e) {
+			logger.debug("Failed to fetch OpenAI models, using defaults", e);
+		}
+		return OPENAI_MODELS;
+	}
+
+	private static boolean isChatModel(String id) {
+		return id.startsWith("gpt-") || id.startsWith("o1") || id.startsWith("o3")
+				|| id.startsWith("o4-mini") || id.startsWith("chatgpt-");
+	}
+
 	public static final String DEFAULT_SYSTEM_PROMPT = """
 			You are a TLS/SSL security expert analyzing a DeepViolet scan report. \
 			The risk assessment lists findings identified by stable rule IDs \
@@ -140,10 +242,10 @@ public class AiAnalysisService {
 			Reference the overall score, grade, and risk level. Identify the \
 			single most impactful finding by its rule ID.
 
-			Next, for EACH finding listed in the risk assessment (every DV-R line), \
+			Next, for EACH finding listed in the risk assessment, \
 			write a section using exactly this format:
 
-			[DV-RNNNNNNN - Brief description from the finding]
+			[RULE-ID [SEVERITY] Brief description from the finding]
 			What it is: One or two sentences explaining what the technology, \
 			standard, or configuration does in plain language.
 			Why it matters: One or two sentences explaining the security impact \
@@ -224,11 +326,31 @@ public class AiAnalysisService {
 			throw new AiAnalysisException("API key is required for AI analysis");
 		}
 
-		return switch (p) {
-			case ANTHROPIC -> callAnthropic(scanReport, apiKey, model, maxTokens, temperature, systemPrompt);
-			case OPENAI -> callOpenAI(scanReport, apiKey, model, maxTokens, temperature, systemPrompt);
-			case OLLAMA -> callOllama(scanReport, model, maxTokens, temperature, systemPrompt, endpointUrl);
-		};
+		aiReportLog.info("AI inline report request: provider={}, model={}, maxTokens={}, temperature={}, reportLength={} chars",
+				p.getDisplayName(), model, maxTokens, temperature, scanReport == null ? 0 : scanReport.length());
+		aiReportLog.debug("AI inline report full request body:\n--- SYSTEM PROMPT ---\n{}\n--- SCAN REPORT ---\n{}",
+				systemPrompt, scanReport);
+
+		long startTime = System.currentTimeMillis();
+		String result;
+		try {
+			result = switch (p) {
+				case ANTHROPIC -> callAnthropic(scanReport, apiKey, model, maxTokens, temperature, systemPrompt);
+				case OPENAI -> callOpenAI(scanReport, apiKey, model, maxTokens, temperature, systemPrompt);
+				case OLLAMA -> callOllama(scanReport, model, maxTokens, temperature, systemPrompt, endpointUrl);
+			};
+		} catch (AiAnalysisException e) {
+			long elapsed = System.currentTimeMillis() - startTime;
+			aiReportLog.info("AI inline report failed after {}ms: {}", elapsed, e.getMessage());
+			throw e;
+		}
+
+		long elapsed = System.currentTimeMillis() - startTime;
+		aiReportLog.info("AI inline report response: provider={}, model={}, elapsed={}ms, responseLength={} chars",
+				p.getDisplayName(), model, elapsed, result == null ? 0 : result.length());
+		aiReportLog.debug("AI inline report full response:\n{}", result);
+
+		return result;
 	}
 
 	private String callAnthropic(String scanReport, String apiKey, String model,
@@ -579,6 +701,95 @@ public class AiAnalysisService {
 			throw e;
 		} catch (Exception e) {
 			throw new AiAnalysisException("Failed to parse Ollama response: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Parse a structured AI response into the given parent section node.
+	 * Detects {@code [Section Name]} delimiters and routes lines prefixed
+	 * with {@code CRITICAL:} or {@code WARNING:} to WARNING nodes.
+	 *
+	 * @param parentSection the section node to populate (e.g. "AI Evaluation")
+	 * @param analysis      the raw AI response text
+	 */
+	public static void parseAiResponse(ScanNode parentSection, String analysis) {
+		parseAiResponse(parentSection, analysis, java.util.Map.of());
+	}
+
+	/**
+	 * Parse a structured AI response into the given parent section node,
+	 * using a severity map to color-code subsection headers that reference
+	 * risk rule IDs.
+	 *
+	 * @param parentSection the section node to populate (e.g. "AI Evaluation")
+	 * @param analysis      the raw AI response text
+	 * @param severityMap   mapping of rule ID prefix (e.g. "SYS-0000900") to severity
+	 */
+	public static void parseAiResponse(ScanNode parentSection, String analysis,
+			java.util.Map<String, String> severityMap) {
+		if (analysis == null || analysis.isEmpty()) {
+			return;
+		}
+
+		// Pattern: ID [SEVERITY] description — used for both headers and content lines
+		java.util.regex.Pattern riskPattern = java.util.regex.Pattern.compile(
+				"^(\\S+)\\s+\\[(CRITICAL|HIGH|MEDIUM|LOW|INFO)]\\s+(.+)$");
+
+		// Pattern to extract a bare rule ID (no inline severity) at the start
+		java.util.regex.Pattern ruleIdPattern = java.util.regex.Pattern.compile(
+				"^(\\S+-\\S+)\\s.*");
+
+		ScanNode currentSub = null;
+		for (String line : analysis.split("\n")) {
+			String trimmed = line.trim();
+
+			if (trimmed.isEmpty()) {
+				continue;
+			}
+
+			// Detect [Section Name] delimiter
+			if (trimmed.startsWith("[") && trimmed.endsWith("]") && trimmed.length() > 2) {
+				String name = trimmed.substring(1, trimmed.length() - 1).trim();
+				if (!name.isEmpty()) {
+					// Try inline severity first: "SYS-0000900 [LOW] description"
+					String severity = null;
+					java.util.regex.Matcher inlineMatcher = riskPattern.matcher(name);
+					if (inlineMatcher.matches()) {
+						severity = inlineMatcher.group(2);
+					} else {
+						// Fall back to severity map lookup by rule ID
+						java.util.regex.Matcher idMatcher = ruleIdPattern.matcher(name);
+						if (idMatcher.matches()) {
+							severity = severityMap.get(idMatcher.group(1));
+							// Reformat "ID - description" to "ID [SEVERITY] description"
+							if (severity != null) {
+								String ruleId = idMatcher.group(1);
+								String rest = name.substring(ruleId.length()).trim();
+								if (rest.startsWith("-")) {
+									rest = rest.substring(1).trim();
+								}
+								name = ruleId + " [" + severity + "] " + rest;
+							}
+						}
+					}
+					currentSub = parentSection.addSubsection(name, severity);
+					continue;
+				}
+			}
+
+			// Route content to current subsection, or section if no delimiter yet
+			ScanNode target = currentSub != null ? currentSub : parentSection;
+
+			// Match risk-format lines with severity for colored rendering
+			java.util.regex.Matcher riskMatcher = riskPattern.matcher(trimmed);
+			if (riskMatcher.matches()) {
+				String severity = riskMatcher.group(2);
+				target.addWarning(trimmed, severity);
+			} else if (trimmed.startsWith("CRITICAL:") || trimmed.startsWith("WARNING:")) {
+				target.addWarning(trimmed);
+			} else {
+				target.addContent(trimmed);
+			}
 		}
 	}
 

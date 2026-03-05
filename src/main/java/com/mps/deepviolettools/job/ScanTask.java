@@ -153,6 +153,16 @@ public class ScanTask implements Runnable {
 	/** User risk rules YAML to propagate to each subtask. */
 	private volatile String userRiskRulesYaml;
 
+	// AI evaluation settings to propagate to each subtask
+	private boolean bAiEvaluationSection = false;
+	private String aiApiKey = "";
+	private String aiProvider = "Anthropic";
+	private String aiModel = "claude-sonnet-4-5-20250929";
+	private int aiMaxTokens = 4096;
+	private double aiTemperature = com.mps.deepviolettools.util.AiAnalysisService.DEFAULT_TEMPERATURE;
+	private String aiSystemPrompt = com.mps.deepviolettools.util.AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
+	private String aiEndpointUrl = com.mps.deepviolettools.util.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
+
 	private int workerThreadCount = 1;
 	private long throttleDelayMs = 0;
 
@@ -220,6 +230,24 @@ public class ScanTask implements Runnable {
 	 */
 	public void setUserRiskRulesYaml(String yaml) {
 		this.userRiskRulesYaml = yaml;
+	}
+
+	/**
+	 * Enable AI evaluation and configure the AI provider settings.
+	 * When enabled, each subtask will run {@code buildAiEvaluation()}
+	 * during the scan.
+	 */
+	public void setAiConfig(String apiKey, String provider, String model,
+							int maxTokens, double temperature,
+							String systemPrompt, String endpointUrl) {
+		this.bAiEvaluationSection = true;
+		this.aiApiKey = apiKey;
+		this.aiProvider = provider;
+		this.aiModel = model;
+		this.aiMaxTokens = maxTokens;
+		this.aiTemperature = temperature;
+		this.aiSystemPrompt = systemPrompt;
+		this.aiEndpointUrl = endpointUrl;
 	}
 
 	public ScanResult getResult() {
@@ -383,6 +411,11 @@ public class ScanTask implements Runnable {
 				st.setRiskScale(riskScale);
 				if (userRiskRulesYaml != null) {
 					st.setUserRiskRulesYaml(userRiskRulesYaml);
+				}
+				if (bAiEvaluationSection) {
+					st.bAiEvaluationSection = true;
+					st.setAiConfig(aiApiKey, aiProvider, aiModel,
+							aiMaxTokens, aiTemperature, aiSystemPrompt, aiEndpointUrl);
 				}
 
 				// Start scanning
