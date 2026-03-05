@@ -11,6 +11,8 @@ import javax.swing.UIManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
 import com.formdev.flatlaf.themes.FlatMacDarkLaf;
 import com.formdev.flatlaf.themes.FlatMacLightLaf;
 import com.mps.deepviolettools.ui.MainFrm;
@@ -40,7 +42,9 @@ public class StartUI {
 	public static void main(String[] args) {
 
 		// Let the JVM pick up the current macOS appearance (light/dark)
-		System.setProperty("apple.awt.application.appearance", "system");
+		if (isMacOs()) {
+			System.setProperty("apple.awt.application.appearance", "system");
+		}
 
 		new StartUI().init(args);
 
@@ -69,17 +73,27 @@ public class StartUI {
 		SwingUtilities.invokeLater(new Runnable() {
 			public void run() {
 				try {
-					boolean dark = isMacOsDarkMode();
+					boolean dark = isSystemDarkMode();
 					// Set accent color BEFORE FlatLaf setup so it derives
 					// all dependent colors (focus borders, etc.) from it
 					java.awt.Color accent = FontPreferences.loadAccentForInit(dark);
 					UIManager.put("@accentColor", accent);
-					if (dark) {
-						FlatMacDarkLaf.setup();
-						logger.debug("Look and feel assigned: FlatMacDarkLaf");
+					if (isMacOs()) {
+						if (dark) {
+							FlatMacDarkLaf.setup();
+							logger.debug("Look and feel assigned: FlatMacDarkLaf");
+						} else {
+							FlatMacLightLaf.setup();
+							logger.debug("Look and feel assigned: FlatMacLightLaf");
+						}
 					} else {
-						FlatMacLightLaf.setup();
-						logger.debug("Look and feel assigned: FlatMacLightLaf");
+						if (dark) {
+							FlatDarkLaf.setup();
+							logger.debug("Look and feel assigned: FlatDarkLaf");
+						} else {
+							FlatLightLaf.setup();
+							logger.debug("Look and feel assigned: FlatLightLaf");
+						}
 					}
 				} catch (Exception e) {
 					logger.warn("FlatLaf setup failed, falling back to system L&F: " + e.getMessage());
@@ -118,10 +132,26 @@ public class StartUI {
 
 	}
 
+	private static boolean isMacOs() {
+		String os = System.getProperty("os.name", "").toLowerCase();
+		return os.contains("mac");
+	}
+
 	/**
-	 * Detect whether macOS is currently in dark mode by reading the system default.
-	 * Returns false on non-macOS platforms or if the setting cannot be read.
+	 * Detect whether the system is in dark mode on the current platform.
+	 * Returns false if the setting cannot be read or the platform is unsupported.
 	 */
+	private static boolean isSystemDarkMode() {
+		String os = System.getProperty("os.name", "").toLowerCase();
+		if (os.contains("mac")) {
+			return isMacOsDarkMode();
+		} else if (os.contains("win")) {
+			return isWindowsDarkMode();
+		} else {
+			return isLinuxDarkMode();
+		}
+	}
+
 	private static boolean isMacOsDarkMode() {
 		try {
 			Process p = Runtime.getRuntime().exec(
@@ -130,6 +160,36 @@ public class StartUI {
 		} catch (Exception e) {
 			return false;
 		}
+	}
+
+	private static boolean isWindowsDarkMode() {
+		try {
+			Process p = Runtime.getRuntime().exec(new String[]{
+				"reg", "query",
+				"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+				"/v", "AppsUseLightTheme"});
+			String output = new String(p.getInputStream().readAllBytes());
+			p.waitFor();
+			return output.contains("0x0"); // 0 = dark mode
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	private static boolean isLinuxDarkMode() {
+		try {
+			Process p = Runtime.getRuntime().exec(new String[]{
+				"gsettings", "get", "org.gnome.desktop.interface", "color-scheme"});
+			String output = new String(p.getInputStream().readAllBytes());
+			p.waitFor();
+			if (output.contains("prefer-dark")) {
+				return true;
+			}
+		} catch (Exception e) {
+			// gsettings not available, try GTK_THEME fallback
+		}
+		String gtkTheme = System.getenv("GTK_THEME");
+		return gtkTheme != null && gtkTheme.toLowerCase().contains("dark");
 	}
 
 }

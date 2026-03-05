@@ -352,7 +352,7 @@ public class MainFrm extends JFrame {
 
 		JMenu devMenu = new JMenu("Developer");
 		modeMenuItem = new JMenuItem(
-				themePrefs.isWorkbenchMode() ? "Mode: workbench" : "Mode: normal");
+				themePrefs.isWorkbenchMode() ? "Mode: advanced" : "Mode: normal");
 		modeMenuItem.addActionListener(e -> toggleMode());
 		devMenu.add(modeMenuItem);
 		menuBar.add(devMenu);
@@ -793,7 +793,7 @@ public class MainFrm extends JFrame {
 			themePrefs.setSectionTlsFingerprint(false);
 		}
 		FontPreferences.save(themePrefs);
-		modeMenuItem.setText(newMode ? "Mode: workbench" : "Mode: normal");
+		modeMenuItem.setText(newMode ? "Mode: advanced" : "Mode: normal");
 		if (currentDeltaResult != null) {
 			deltaResultsPanel.refreshDetail();
 		}
