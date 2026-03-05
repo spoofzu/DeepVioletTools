@@ -113,7 +113,7 @@ The main window has two tabs:
 |------|------|-------------|
 | **System** | Settings | Open the Settings dialog (Reporting, Engine, AI, Cipher Map, User Risks, and Application tabs) |
 | **System** | Exit | Save window state and quit |
-| **Developer** | Mode | Toggle between workbench and normal mode |
+| **Developer** | Mode | Toggle between advanced and normal mode |
 | **Help** | Interface | Open the Interface help dialog (scan output documentation) |
 | **Help** | About | Project information and links |
 

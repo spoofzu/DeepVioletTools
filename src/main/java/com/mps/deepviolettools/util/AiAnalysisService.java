@@ -10,17 +10,18 @@ import java.util.List;
 
 import com.mps.deepviolettools.model.ScanNode;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * HTTP client for Anthropic and OpenAI chat completion APIs.
- * Uses {@code java.net.http.HttpClient} (Java 21+) and Jackson for JSON.
+ * Uses {@code java.net.http.HttpClient} (Java 21+) and Gson for JSON.
  *
  * @author Milton Smith
  */
@@ -107,12 +108,13 @@ public class AiAnalysisService {
 					HttpResponse.BodyHandlers.ofString());
 
 			if (response.statusCode() == 200) {
-				JsonNode root = mapper.readTree(response.body());
-				JsonNode models = root.path("models");
-				if (models.isArray() && !models.isEmpty()) {
+				JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+				if (root.has("models") && root.get("models").isJsonArray()) {
+					JsonArray models = root.getAsJsonArray("models");
 					java.util.List<String> names = new java.util.ArrayList<>();
-					for (JsonNode model : models) {
-						String name = model.path("name").asText("");
+					for (JsonElement model : models) {
+						JsonObject obj = model.getAsJsonObject();
+						String name = obj.has("name") ? obj.get("name").getAsString() : "";
 						if (!name.isEmpty()) {
 							names.add(name);
 						}
@@ -152,12 +154,13 @@ public class AiAnalysisService {
 					HttpResponse.BodyHandlers.ofString());
 
 			if (response.statusCode() == 200) {
-				JsonNode root = mapper.readTree(response.body());
-				JsonNode data = root.path("data");
-				if (data.isArray() && !data.isEmpty()) {
+				JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+				if (root.has("data") && root.get("data").isJsonArray()) {
+					JsonArray data = root.getAsJsonArray("data");
 					java.util.List<String> ids = new java.util.ArrayList<>();
-					for (JsonNode model : data) {
-						String id = model.path("id").asText("");
+					for (JsonElement model : data) {
+						JsonObject obj = model.getAsJsonObject();
+						String id = obj.has("id") ? obj.get("id").getAsString() : "";
 						if (!id.isEmpty()) {
 							ids.add(id);
 						}
@@ -198,12 +201,13 @@ public class AiAnalysisService {
 					HttpResponse.BodyHandlers.ofString());
 
 			if (response.statusCode() == 200) {
-				JsonNode root = mapper.readTree(response.body());
-				JsonNode data = root.path("data");
-				if (data.isArray() && !data.isEmpty()) {
+				JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+				if (root.has("data") && root.get("data").isJsonArray()) {
+					JsonArray data = root.getAsJsonArray("data");
 					java.util.List<String> ids = new java.util.ArrayList<>();
-					for (JsonNode model : data) {
-						String id = model.path("id").asText("");
+					for (JsonElement model : data) {
+						JsonObject obj = model.getAsJsonObject();
+						String id = obj.has("id") ? obj.get("id").getAsString() : "";
 						if (!id.isEmpty() && isChatModel(id)) {
 							ids.add(id);
 						}
@@ -278,7 +282,7 @@ public class AiAnalysisService {
 			first. No markdown, no bold, no bullet lists, no numbered \
 			lists, no headings, no line breaks. Plain sentences only.""";
 
-	private static final ObjectMapper mapper = new ObjectMapper();
+	private static final Gson gson = new Gson();
 
 	public static final double DEFAULT_TEMPERATURE = 0.3;
 
@@ -357,16 +361,18 @@ public class AiAnalysisService {
 								 int maxTokens, double temperature,
 								 String systemPrompt) throws AiAnalysisException {
 		try {
-			ObjectNode body = mapper.createObjectNode();
-			body.put("model", model);
-			body.put("max_tokens", maxTokens);
-			body.put("temperature", temperature);
-			body.put("system", systemPrompt);
+			JsonObject body = new JsonObject();
+			body.addProperty("model", model);
+			body.addProperty("max_tokens", maxTokens);
+			body.addProperty("temperature", temperature);
+			body.addProperty("system", systemPrompt);
 
-			ArrayNode messages = body.putArray("messages");
-			ObjectNode userMsg = messages.addObject();
-			userMsg.put("role", "user");
-			userMsg.put("content", scanReport);
+			JsonArray messages = new JsonArray();
+			JsonObject userMsg = new JsonObject();
+			userMsg.addProperty("role", "user");
+			userMsg.addProperty("content", scanReport);
+			messages.add(userMsg);
+			body.add("messages", messages);
 
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create("https://api.anthropic.com/v1/messages"))
@@ -374,7 +380,7 @@ public class AiAnalysisService {
 					.header("x-api-key", apiKey)
 					.header("anthropic-version", "2023-06-01")
 					.timeout(Duration.ofSeconds(120))
-					.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+					.POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
 					.build();
 
 			HttpResponse<String> response = httpClient.send(request,
@@ -404,10 +410,13 @@ public class AiAnalysisService {
 		}
 
 		try {
-			JsonNode root = mapper.readTree(response.body());
-			JsonNode content = root.path("content");
-			if (content.isArray() && !content.isEmpty()) {
-				return content.get(0).path("text").asText("");
+			JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+			if (root.has("content") && root.get("content").isJsonArray()) {
+				JsonArray content = root.getAsJsonArray("content");
+				if (!content.isEmpty()) {
+					JsonObject first = content.get(0).getAsJsonObject();
+					return first.has("text") ? first.get("text").getAsString() : "";
+				}
 			}
 			throw new AiAnalysisException("Unexpected Anthropic response format");
 		} catch (AiAnalysisException e) {
@@ -421,25 +430,28 @@ public class AiAnalysisService {
 							  int maxTokens, double temperature,
 							  String systemPrompt) throws AiAnalysisException {
 		try {
-			ObjectNode body = mapper.createObjectNode();
-			body.put("model", model);
-			body.put("max_tokens", maxTokens);
-			body.put("temperature", temperature);
+			JsonObject body = new JsonObject();
+			body.addProperty("model", model);
+			body.addProperty("max_tokens", maxTokens);
+			body.addProperty("temperature", temperature);
 
-			ArrayNode messages = body.putArray("messages");
-			ObjectNode sysMsg = messages.addObject();
-			sysMsg.put("role", "system");
-			sysMsg.put("content", systemPrompt);
-			ObjectNode userMsg = messages.addObject();
-			userMsg.put("role", "user");
-			userMsg.put("content", scanReport);
+			JsonArray messages = new JsonArray();
+			JsonObject sysMsg = new JsonObject();
+			sysMsg.addProperty("role", "system");
+			sysMsg.addProperty("content", systemPrompt);
+			messages.add(sysMsg);
+			JsonObject userMsg = new JsonObject();
+			userMsg.addProperty("role", "user");
+			userMsg.addProperty("content", scanReport);
+			messages.add(userMsg);
+			body.add("messages", messages);
 
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create("https://api.openai.com/v1/chat/completions"))
 					.header("Content-Type", "application/json")
 					.header("Authorization", "Bearer " + apiKey)
 					.timeout(Duration.ofSeconds(120))
-					.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+					.POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
 					.build();
 
 			HttpResponse<String> response = httpClient.send(request,
@@ -469,10 +481,13 @@ public class AiAnalysisService {
 		}
 
 		try {
-			JsonNode root = mapper.readTree(response.body());
-			JsonNode choices = root.path("choices");
-			if (choices.isArray() && !choices.isEmpty()) {
-				return choices.get(0).path("message").path("content").asText("");
+			JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+			if (root.has("choices") && root.get("choices").isJsonArray()) {
+				JsonArray choices = root.getAsJsonArray("choices");
+				if (!choices.isEmpty()) {
+					JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
+					return message != null && message.has("content") ? message.get("content").getAsString() : "";
+				}
 			}
 			throw new AiAnalysisException("Unexpected OpenAI response format");
 		} catch (AiAnalysisException e) {
@@ -516,18 +531,20 @@ public class AiAnalysisService {
 									  String model, int maxTokens, double temperature,
 									  String systemPrompt) throws AiAnalysisException {
 		try {
-			ObjectNode body = mapper.createObjectNode();
-			body.put("model", model);
-			body.put("max_tokens", maxTokens);
-			body.put("temperature", temperature);
-			body.put("system", systemPrompt);
+			JsonObject body = new JsonObject();
+			body.addProperty("model", model);
+			body.addProperty("max_tokens", maxTokens);
+			body.addProperty("temperature", temperature);
+			body.addProperty("system", systemPrompt);
 
-			ArrayNode msgArray = body.putArray("messages");
+			JsonArray msgArray = new JsonArray();
 			for (ChatMessage msg : messages) {
-				ObjectNode m = msgArray.addObject();
-				m.put("role", msg.role());
-				m.put("content", msg.content());
+				JsonObject m = new JsonObject();
+				m.addProperty("role", msg.role());
+				m.addProperty("content", msg.content());
+				msgArray.add(m);
 			}
+			body.add("messages", msgArray);
 
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create("https://api.anthropic.com/v1/messages"))
@@ -535,7 +552,7 @@ public class AiAnalysisService {
 					.header("x-api-key", apiKey)
 					.header("anthropic-version", "2023-06-01")
 					.timeout(Duration.ofSeconds(120))
-					.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+					.POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
 					.build();
 
 			HttpResponse<String> response = httpClient.send(request,
@@ -555,27 +572,30 @@ public class AiAnalysisService {
 								   String model, int maxTokens, double temperature,
 								   String systemPrompt) throws AiAnalysisException {
 		try {
-			ObjectNode body = mapper.createObjectNode();
-			body.put("model", model);
-			body.put("max_tokens", maxTokens);
-			body.put("temperature", temperature);
+			JsonObject body = new JsonObject();
+			body.addProperty("model", model);
+			body.addProperty("max_tokens", maxTokens);
+			body.addProperty("temperature", temperature);
 
-			ArrayNode msgArray = body.putArray("messages");
-			ObjectNode sysMsg = msgArray.addObject();
-			sysMsg.put("role", "system");
-			sysMsg.put("content", systemPrompt);
+			JsonArray msgArray = new JsonArray();
+			JsonObject sysMsg = new JsonObject();
+			sysMsg.addProperty("role", "system");
+			sysMsg.addProperty("content", systemPrompt);
+			msgArray.add(sysMsg);
 			for (ChatMessage msg : messages) {
-				ObjectNode m = msgArray.addObject();
-				m.put("role", msg.role());
-				m.put("content", msg.content());
+				JsonObject m = new JsonObject();
+				m.addProperty("role", msg.role());
+				m.addProperty("content", msg.content());
+				msgArray.add(m);
 			}
+			body.add("messages", msgArray);
 
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create("https://api.openai.com/v1/chat/completions"))
 					.header("Content-Type", "application/json")
 					.header("Authorization", "Bearer " + apiKey)
 					.timeout(Duration.ofSeconds(120))
-					.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+					.POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
 					.build();
 
 			HttpResponse<String> response = httpClient.send(request,
@@ -598,27 +618,31 @@ public class AiAnalysisService {
 			String baseUrl = (endpointUrl != null && !endpointUrl.isBlank())
 					? endpointUrl : DEFAULT_OLLAMA_ENDPOINT;
 
-			ObjectNode body = mapper.createObjectNode();
-			body.put("model", model);
-			body.put("stream", false);
+			JsonObject body = new JsonObject();
+			body.addProperty("model", model);
+			body.addProperty("stream", false);
 
-			ObjectNode options = body.putObject("options");
-			options.put("temperature", temperature);
-			options.put("num_predict", maxTokens);
+			JsonObject options = new JsonObject();
+			options.addProperty("temperature", temperature);
+			options.addProperty("num_predict", maxTokens);
+			body.add("options", options);
 
-			ArrayNode messages = body.putArray("messages");
-			ObjectNode sysMsg = messages.addObject();
-			sysMsg.put("role", "system");
-			sysMsg.put("content", systemPrompt);
-			ObjectNode userMsg = messages.addObject();
-			userMsg.put("role", "user");
-			userMsg.put("content", scanReport);
+			JsonArray messages = new JsonArray();
+			JsonObject sysMsg = new JsonObject();
+			sysMsg.addProperty("role", "system");
+			sysMsg.addProperty("content", systemPrompt);
+			messages.add(sysMsg);
+			JsonObject userMsg = new JsonObject();
+			userMsg.addProperty("role", "user");
+			userMsg.addProperty("content", scanReport);
+			messages.add(userMsg);
+			body.add("messages", messages);
 
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create(baseUrl.replaceAll("/+$", "") + "/api/chat"))
 					.header("Content-Type", "application/json")
 					.timeout(Duration.ofSeconds(300))
-					.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+					.POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
 					.build();
 
 			HttpResponse<String> response = httpClient.send(request,
@@ -641,29 +665,33 @@ public class AiAnalysisService {
 			String baseUrl = (endpointUrl != null && !endpointUrl.isBlank())
 					? endpointUrl : DEFAULT_OLLAMA_ENDPOINT;
 
-			ObjectNode body = mapper.createObjectNode();
-			body.put("model", model);
-			body.put("stream", false);
+			JsonObject body = new JsonObject();
+			body.addProperty("model", model);
+			body.addProperty("stream", false);
 
-			ObjectNode options = body.putObject("options");
-			options.put("temperature", temperature);
-			options.put("num_predict", maxTokens);
+			JsonObject options = new JsonObject();
+			options.addProperty("temperature", temperature);
+			options.addProperty("num_predict", maxTokens);
+			body.add("options", options);
 
-			ArrayNode msgArray = body.putArray("messages");
-			ObjectNode sysMsg = msgArray.addObject();
-			sysMsg.put("role", "system");
-			sysMsg.put("content", systemPrompt);
+			JsonArray msgArray = new JsonArray();
+			JsonObject sysMsg = new JsonObject();
+			sysMsg.addProperty("role", "system");
+			sysMsg.addProperty("content", systemPrompt);
+			msgArray.add(sysMsg);
 			for (ChatMessage msg : messages) {
-				ObjectNode m = msgArray.addObject();
-				m.put("role", msg.role());
-				m.put("content", msg.content());
+				JsonObject m = new JsonObject();
+				m.addProperty("role", msg.role());
+				m.addProperty("content", msg.content());
+				msgArray.add(m);
 			}
+			body.add("messages", msgArray);
 
 			HttpRequest request = HttpRequest.newBuilder()
 					.uri(URI.create(baseUrl.replaceAll("/+$", "") + "/api/chat"))
 					.header("Content-Type", "application/json")
 					.timeout(Duration.ofSeconds(300))
-					.POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+					.POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
 					.build();
 
 			HttpResponse<String> response = httpClient.send(request,
@@ -691,10 +719,12 @@ public class AiAnalysisService {
 		}
 
 		try {
-			JsonNode root = mapper.readTree(response.body());
-			JsonNode message = root.path("message");
-			if (message.has("content")) {
-				return message.path("content").asText("");
+			JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+			if (root.has("message")) {
+				JsonObject message = root.getAsJsonObject("message");
+				if (message.has("content")) {
+					return message.get("content").getAsString();
+				}
 			}
 			throw new AiAnalysisException("Unexpected Ollama response format");
 		} catch (AiAnalysisException e) {

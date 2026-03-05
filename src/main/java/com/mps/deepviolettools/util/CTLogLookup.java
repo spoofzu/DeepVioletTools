@@ -15,8 +15,10 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 /**
  * Looks up CT (Certificate Transparency) log metadata by LogID.
@@ -141,16 +143,16 @@ public class CTLogLookup {
 	private static Map<String, CTLogInfo> parseLogList(String json) {
 		Map<String, CTLogInfo> index = new HashMap<>();
 		try {
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode root = mapper.readTree(json);
-			JsonNode operators = root.get("operators");
-			if (operators == null || !operators.isArray()) {
+			JsonObject root = JsonParser.parseString(json).getAsJsonObject();
+			if (!root.has("operators") || !root.get("operators").isJsonArray()) {
 				return index;
 			}
+			JsonArray operators = root.getAsJsonArray("operators");
 
-			for (JsonNode operator : operators) {
-				parseLogArray(operator.get("logs"), index);
-				parseLogArray(operator.get("tiled_logs"), index);
+			for (JsonElement operator : operators) {
+				JsonObject op = operator.getAsJsonObject();
+				parseLogArray(op.has("logs") ? op.getAsJsonArray("logs") : null, index);
+				parseLogArray(op.has("tiled_logs") ? op.getAsJsonArray("tiled_logs") : null, index);
 			}
 
 			logger.info("CT log list loaded: {} logs indexed", index.size());
@@ -164,15 +166,16 @@ public class CTLogLookup {
 	/**
 	 * Parse a "logs" or "tiled_logs" JSON array and add entries to the index.
 	 */
-	private static void parseLogArray(JsonNode logsNode, Map<String, CTLogInfo> index) {
-		if (logsNode == null || !logsNode.isArray()) {
+	private static void parseLogArray(JsonArray logsNode, Map<String, CTLogInfo> index) {
+		if (logsNode == null) {
 			return;
 		}
-		for (JsonNode log : logsNode) {
+		for (JsonElement elem : logsNode) {
+			JsonObject log = elem.getAsJsonObject();
 			String logId = textOrNull(log, "log_id");
 			String description = textOrNull(log, "description");
 			String url = textOrNull(log, "url");
-			String state = extractState(log.get("state"));
+			String state = extractState(log.has("state") ? log.getAsJsonObject("state") : null);
 			String key = textOrNull(log, "key");
 
 			if (logId != null && description != null) {
@@ -186,22 +189,25 @@ public class CTLogLookup {
 	 * The state is an object with a single key that is the state name,
 	 * e.g. {"usable": {"timestamp": "..."}}.
 	 */
-	private static String extractState(JsonNode stateNode) {
-		if (stateNode == null || !stateNode.isObject()) {
+	private static String extractState(JsonObject stateNode) {
+		if (stateNode == null) {
 			return "unknown";
 		}
-		var fields = stateNode.fieldNames();
-		if (fields.hasNext()) {
-			return fields.next();
+		var keys = stateNode.keySet();
+		if (!keys.isEmpty()) {
+			return keys.iterator().next();
 		}
 		return "unknown";
 	}
 
 	/**
-	 * Safely extract a text value from a JSON node field.
+	 * Safely extract a text value from a JSON object field.
 	 */
-	private static String textOrNull(JsonNode node, String field) {
-		JsonNode child = node.get(field);
-		return (child != null && child.isTextual()) ? child.asText() : null;
+	private static String textOrNull(JsonObject node, String field) {
+		if (!node.has(field) || node.get(field).isJsonNull()) {
+			return null;
+		}
+		JsonElement child = node.get(field);
+		return child.isJsonPrimitive() ? child.getAsString() : null;
 	}
 }
