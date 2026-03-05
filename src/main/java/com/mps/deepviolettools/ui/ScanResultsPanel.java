@@ -313,9 +313,12 @@ public class ScanResultsPanel extends JPanel {
         }
         cardContainer.repaint();
 
-        // Re-render detail if a host is selected
+        // Re-render detail content with the new font/colors.
+        // Covers both a selected host card and the startup placeholder.
         if (navState == NavState.HOST_DETAIL && selectedCard != null) {
             showHostDetail(selectedCard.getHostResult());
+        } else if (detailDoc.getLength() > 0) {
+            rerenderDetailFromCards();
         }
     }
 
@@ -411,6 +414,27 @@ public class ScanResultsPanel extends JPanel {
      * cards are showing (large scans) this is a no-op — the user must
      * first drill into a grade before individual cards appear.
      */
+    /**
+     * Re-render the detail pane from the first card that has a scan tree.
+     * Used by {@link #applyTheme} when no card is selected (e.g. placeholder).
+     */
+    private void rerenderDetailFromCards() {
+        for (Component c : cardContainer.getComponents()) {
+            if (c instanceof HostCard) {
+                HostResult hr = ((HostCard) c).getHostResult();
+                if (hr != null && hr.getScanTree() != null && detailRenderer != null) {
+                    try {
+                        detailDoc.remove(0, detailDoc.getLength());
+                    } catch (javax.swing.text.BadLocationException ignored) {
+                    }
+                    detailRenderer.accept(hr.getScanTree(), detailDoc);
+                    detailPane.setCaretPosition(0);
+                    return;
+                }
+            }
+        }
+    }
+
     private void selectFirstCard() {
         for (Component c : cardContainer.getComponents()) {
             if (c instanceof HostCard) {
