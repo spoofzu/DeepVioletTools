@@ -161,7 +161,7 @@ See [docs/DeepVioletTools.md](docs/DeepVioletTools.md) for comprehensive documen
 
 ## Acknowledgements
 
-This tool implements ideas, code, and takes inspiration from: Qualys SSL Labs and Ivan Ristic, OpenSSL, Oracle's Java Security Team, and Thomas Pornin. AI coding assistance by Claude Code AI.
+This tool implements ideas, code, and takes inspiration from: Qualys SSL Labs and Ivan Ristic, OpenSSL, Oracle's Java Security Team, and Thomas Pornin. Bundled monospace fonts by IBM Corp., The JetBrains Mono Project Authors, and The Mozilla Foundation and Telefonica S.A. AI coding assistance by Claude Code AI.
 
 ## License
 
