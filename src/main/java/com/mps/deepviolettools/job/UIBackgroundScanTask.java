@@ -50,6 +50,10 @@ import com.mps.deepviolet.api.fingerprint.TlsServerFingerprint;
 import com.mps.deepviolettools.model.ScanNode;
 import com.mps.deepviolettools.util.AiAnalysisService;
 import com.mps.deepviolettools.util.CTLogLookup;
+import com.mps.deepviolet.api.ai.AiAnalysisException;
+import com.mps.deepviolet.api.ai.AiConfig;
+import com.mps.deepviolet.api.ai.AiProvider;
+import com.mps.deepviolet.api.ai.IAiAnalysisService;
 import com.mps.deepviolettools.util.SctVerifier;
 
 /**
@@ -130,9 +134,9 @@ public class UIBackgroundScanTask extends BackgroundTask {
 	private String aiProvider = "Anthropic";
 	private String aiModel = "claude-sonnet-4-5-20250929";
 	private int aiMaxTokens = 4096;
-	private double aiTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
-	private String aiSystemPrompt = AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
-	private String aiEndpointUrl = AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
+	private double aiTemperature = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE;
+	private String aiSystemPrompt = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
+	private String aiEndpointUrl = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
 
 	/** User risk rules YAML to merge with system rules during risk scoring. */
 	private volatile String userRiskRulesYaml;
@@ -1617,12 +1621,23 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		String reportSoFar = toPlainText();
 
 		try {
-			AiAnalysisService service = new AiAnalysisService();
-			String analysis = service.analyze(reportSoFar, aiApiKey, aiProvider,
-					aiModel, aiMaxTokens, aiTemperature, aiSystemPrompt, aiEndpointUrl);
+			AiConfig config = AiConfig.builder()
+					.provider(AiProvider.fromDisplayName(aiProvider))
+					.apiKey(aiApiKey)
+					.model(aiModel)
+					.maxTokens(aiMaxTokens)
+					.temperature(aiTemperature)
+					.systemPrompt(aiSystemPrompt)
+					.endpointUrl(aiEndpointUrl)
+					.build();
+
+			IAiAnalysisService aiService = DeepVioletFactory.getAiService();
+			java.io.InputStream reportStream = new ByteArrayInputStream(
+					reportSoFar.getBytes(StandardCharsets.UTF_8));
+			String analysis = aiService.analyze(reportStream, config);
 
 			AiAnalysisService.parseAiResponse(section, analysis, severityMap);
-		} catch (AiAnalysisService.AiAnalysisException e) {
+		} catch (AiAnalysisException e) {
 			lastBuildError = e.getMessage();
 			section.addWarning(">>> AI evaluation failed: " + e.getMessage() + " <<<");
 			logger.error("AI evaluation failed", e);

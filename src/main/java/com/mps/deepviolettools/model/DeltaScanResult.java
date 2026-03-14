@@ -14,8 +14,8 @@ public class DeltaScanResult {
 
     private final File baseFile;
     private final File targetFile;
-    private final ScanResult.SourceProvenance baseProvenance;
-    private final ScanResult.SourceProvenance targetProvenance;
+    private final String baseScanId;
+    private final String targetScanId;
     private final Date comparisonDate;
     private final int baseHostCount;
     private final int targetHostCount;
@@ -26,13 +26,12 @@ public class DeltaScanResult {
     private final List<HostDelta> hostDeltas;
 
     public DeltaScanResult(File baseFile, File targetFile,
-                           ScanResult.SourceProvenance baseProvenance,
-                           ScanResult.SourceProvenance targetProvenance,
+                           String baseScanId, String targetScanId,
                            int baseHostCount, int targetHostCount) {
         this.baseFile = baseFile;
         this.targetFile = targetFile;
-        this.baseProvenance = baseProvenance;
-        this.targetProvenance = targetProvenance;
+        this.baseScanId = baseScanId;
+        this.targetScanId = targetScanId;
         this.comparisonDate = new Date();
         this.baseHostCount = baseHostCount;
         this.targetHostCount = targetHostCount;
@@ -68,8 +67,8 @@ public class DeltaScanResult {
 
     public File getBaseFile() { return baseFile; }
     public File getTargetFile() { return targetFile; }
-    public ScanResult.SourceProvenance getBaseProvenance() { return baseProvenance; }
-    public ScanResult.SourceProvenance getTargetProvenance() { return targetProvenance; }
+    public String getBaseScanId() { return baseScanId; }
+    public String getTargetScanId() { return targetScanId; }
     public Date getComparisonDate() { return comparisonDate; }
     public int getBaseHostCount() { return baseHostCount; }
     public int getTargetHostCount() { return targetHostCount; }

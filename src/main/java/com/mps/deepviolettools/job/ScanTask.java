@@ -159,9 +159,9 @@ public class ScanTask implements Runnable {
 	private String aiProvider = "Anthropic";
 	private String aiModel = "claude-sonnet-4-5-20250929";
 	private int aiMaxTokens = 4096;
-	private double aiTemperature = com.mps.deepviolettools.util.AiAnalysisService.DEFAULT_TEMPERATURE;
-	private String aiSystemPrompt = com.mps.deepviolettools.util.AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
-	private String aiEndpointUrl = com.mps.deepviolettools.util.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
+	private double aiTemperature = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE;
+	private String aiSystemPrompt = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
+	private String aiEndpointUrl = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
 
 	private int workerThreadCount = 1;
 	private long throttleDelayMs = 0;

@@ -44,8 +44,13 @@ import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
 
 import com.mps.deepviolettools.model.CardLayout;
-import com.mps.deepviolettools.util.AiAnalysisService;
 import com.mps.deepviolettools.util.FontPreferences;
+import com.mps.deepviolet.api.DeepVioletFactory;
+import com.mps.deepviolet.api.ai.AiAnalysisException;
+import com.mps.deepviolet.api.ai.AiAnalysisService;
+import com.mps.deepviolet.api.ai.AiConfig;
+import com.mps.deepviolet.api.ai.AiProvider;
+import com.mps.deepviolet.api.ai.IAiAnalysisService;
 
 import org.ms.terminal.gui.TerminalPanel;
 import org.ms.terminal.gui.TerminalView;
@@ -177,6 +182,7 @@ public class FontChooserDialog extends JDialog {
 	private CardTrashPanel cardTrashPanel;
 
 	// Application tab controls
+	private JCheckBox chkSuppressSaveWarning;
 	private JComboBox<String> cmbAppFontFamily;
 	private JComboBox<Integer> cmbAppFontSize;
 	private JButton btnAppBg;
@@ -339,6 +345,10 @@ public class FontChooserDialog extends JDialog {
 				prefs.getSubsection());
 		btnHighlight = addColorRow(pnlColors, cc, 4, 2, "Highlight:",
 				prefs.getHighlight());
+		// Spacer absorbs extra width
+		cc.gridx = 4; cc.gridy = 0; cc.weightx = 1.0;
+		cc.fill = GridBagConstraints.HORIZONTAL;
+		pnlColors.add(new JPanel(), cc);
 
 		// ---- presets panel ----
 		JPanel pnlPresets = new JPanel(new GridBagLayout());
@@ -390,6 +400,10 @@ public class FontChooserDialog extends JDialog {
 		rc2.gridx = 2; rc2.gridwidth = 4;
 		pnlRiskColors.add(new JLabel("blocks"), rc2);
 		rc2.gridwidth = 1;
+		// Spacer absorbs extra width
+		rc2.gridx = 6; rc2.gridy = 0; rc2.weightx = 1.0;
+		rc2.fill = GridBagConstraints.HORIZONTAL;
+		pnlRiskColors.add(new JPanel(), rc2);
 
 		// ---- risk priority panel ----
 		JPanel pnlRiskPriority = new JPanel(new GridBagLayout());
@@ -408,6 +422,10 @@ public class FontChooserDialog extends JDialog {
 				prefs.getRiskLow());
 		btnRiskInfo = addColorRow(pnlRiskPriority, rpc, 2, 0, "Info:",
 				prefs.getRiskInfo());
+		// Spacer absorbs extra width
+		rpc.gridx = 4; rpc.gridy = 0; rpc.weightx = 1.0;
+		rpc.fill = GridBagConstraints.HORIZONTAL;
+		pnlRiskPriority.add(new JPanel(), rpc);
 
 		// ---- output panel ----
 		JPanel pnlOutput = new JPanel(new GridBagLayout());
@@ -433,6 +451,10 @@ public class FontChooserDialog extends JDialog {
 
 		oc.gridx = 3;
 		pnlOutput.add(new JLabel("characters"), oc);
+		// Spacer absorbs extra width
+		oc.gridx = 4; oc.weightx = 1.0;
+		oc.fill = GridBagConstraints.HORIZONTAL;
+		pnlOutput.add(new JPanel(), oc);
 
 		// ---- card font panel ----
 		JPanel pnlCardFont = new JPanel(new GridBagLayout());
@@ -498,6 +520,10 @@ public class FontChooserDialog extends JDialog {
 		btnCardBorder = addColorRow(pnlCardColors, ccc, 0, 2, "Border:", prefs.getCardBorder());
 		btnCardSelected = addColorRow(pnlCardColors, ccc, 1, 2, "Selected:", prefs.getCardSelected());
 		btnCardError = addColorRow(pnlCardColors, ccc, 2, 2, "Error:", prefs.getCardError());
+		// Spacer absorbs extra width
+		ccc.gridx = 4; ccc.gridy = 0; ccc.weightx = 1.0;
+		ccc.fill = GridBagConstraints.HORIZONTAL;
+		pnlCardColors.add(new JPanel(), ccc);
 
 		// ---- card layout editor (palette | grid | trash+spinners) ----
 		cardMetaPalette = new CardMetaPalette();
@@ -948,6 +974,12 @@ public class FontChooserDialog extends JDialog {
 		chkTlsFingerprint.setSelected(prefs.isSectionTlsFingerprint());
 		rc.gridx = 1; rc.gridy = 4;
 		pnlReportSections.add(chkTlsFingerprint, rc);
+		// Spacer absorbs extra width
+		rc.gridx = 2; rc.gridy = 0; rc.weightx = 1.0;
+		rc.fill = GridBagConstraints.HORIZONTAL;
+		rc.insets = new Insets(2, 6, 2, 6);
+		pnlReportSections.add(new JPanel(), rc);
+		rc.weightx = 0; rc.fill = GridBagConstraints.NONE;
 
 		// Select All / Deselect All buttons spanning both columns
 		JPanel pnlSelectBtns = new JPanel();
@@ -991,11 +1023,16 @@ public class FontChooserDialog extends JDialog {
 
 		String[] conventions = { "IANA", "OpenSSL", "GnuTLS", "NSS" };
 		cmbCipherConvention = new JComboBox<>(conventions);
+		cmbCipherConvention.setPrototypeDisplayValue("Monospaced Extended");
 		cmbCipherConvention.setSelectedItem(prefs.getCipherConvention());
 		cpc.gridx = 1;
-		cpc.fill = GridBagConstraints.HORIZONTAL;
-		cpc.weightx = 1.0;
+		cpc.fill = GridBagConstraints.NONE;
+		cpc.weightx = 0;
 		pnlCipher.add(cmbCipherConvention, cpc);
+		// Spacer absorbs extra width
+		cpc.gridx = 2; cpc.weightx = 1.0;
+		cpc.fill = GridBagConstraints.HORIZONTAL;
+		pnlCipher.add(new JPanel(), cpc);
 
 		ec.gridy = 1;
 		panel.add(pnlCipher, ec);
@@ -1035,6 +1072,11 @@ public class FontChooserDialog extends JDialog {
 		chkTls13.setSelected(prefs.isProtocolTls13());
 		pc.gridx = 1; pc.gridy = 1;
 		pnlProtocol.add(chkTls13, pc);
+		// Spacer absorbs extra width
+		pc.gridx = 2; pc.gridy = 0; pc.weightx = 1.0;
+		pc.fill = GridBagConstraints.HORIZONTAL;
+		pc.insets = new Insets(2, 6, 2, 6);
+		pnlProtocol.add(new JPanel(), pc);
 
 		ec.gridy = 2;
 		panel.add(pnlProtocol, ec);
@@ -1061,6 +1103,10 @@ public class FontChooserDialog extends JDialog {
 		pnlPriority.add(spnThrottleDelayMs, pc2);
 		pc2.gridx = 2;
 		pnlPriority.add(new JLabel("ms"), pc2);
+		// Spacer absorbs extra width
+		pc2.gridx = 3; pc2.gridy = 0; pc2.weightx = 1.0;
+		pc2.fill = GridBagConstraints.HORIZONTAL;
+		pnlPriority.add(new JPanel(), pc2);
 
 		ec.gridy = 3;
 		panel.add(pnlPriority, ec);
@@ -1252,6 +1298,10 @@ public class FontChooserDialog extends JDialog {
 		// Row 4
 		btnAiTermSelectionFg = addColorRow(pnlAiTermColors, atc, 4, 0, "Select Fg:",
 				prefs.getAiTerminalSelectionFg());
+		// Spacer absorbs extra width
+		atc.gridx = 6; atc.gridy = 0; atc.weightx = 1.0;
+		atc.fill = GridBagConstraints.HORIZONTAL;
+		pnlAiTermColors.add(new JPanel(), atc);
 
 		// Preview terminal
 		TerminalView aiPreviewView = new TerminalView();
@@ -1345,27 +1395,35 @@ public class FontChooserDialog extends JDialog {
 		chk.setSelected(savedEnabled);
 		section.add(chk, pc);
 		pc.gridwidth = 1;
+		// Spacer absorbs extra width
+		pc.gridx = 4; pc.weightx = 1.0;
+		pc.fill = GridBagConstraints.HORIZONTAL;
+		section.add(new JPanel(), pc);
+		pc.weightx = 0; pc.fill = GridBagConstraints.NONE;
 
 		// Row 1: Provider
 		pc.gridx = 0; pc.gridy = 1;
 		section.add(new JLabel("Provider:"), pc);
+		cmbProvider.setPrototypeDisplayValue("Monospaced Extended");
 		cmbProvider.setSelectedItem(savedProvider);
-		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		pc.gridx = 1; pc.gridwidth = 3;
 		section.add(cmbProvider, pc);
-		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+		pc.gridwidth = 1;
 
 		// Row 2: API Key / Endpoint
 		pc.gridx = 0; pc.gridy = 2;
 		section.add(lblKey, pc);
-		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		txtKey.setColumns(20);
+		pc.gridx = 1; pc.gridwidth = 3;
 		section.add(txtKey, pc);
-		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+		pc.gridwidth = 1;
 
 		pc.gridx = 0; pc.gridy = 3;
 		section.add(lblEndpoint, pc);
-		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		txtEndpoint.setColumns(20);
+		pc.gridx = 1; pc.gridwidth = 3;
 		section.add(txtEndpoint, pc);
-		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+		pc.gridwidth = 1;
 
 		boolean isOllama = "Ollama".equalsIgnoreCase(savedProvider);
 		lblKey.setVisible(!isOllama);
@@ -1377,25 +1435,26 @@ public class FontChooserDialog extends JDialog {
 		pc.gridx = 0; pc.gridy = 4; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
 		section.add(new JLabel("Model:"), pc);
 
-		AiAnalysisService.Provider currentProvider = AiAnalysisService.Provider.fromDisplayName(savedProvider);
-		String[] defaultModels = AiAnalysisService.getModelsForProvider(currentProvider);
+		AiProvider currentProvider = AiProvider.fromDisplayName(savedProvider);
+		String[] defaultModels = currentProvider.getDefaultModels();
 		for (String m : defaultModels) cmbModel.addItem(m);
 		cmbModel.setSelectedItem(savedModel);
 
 		// Fetch actual models from provider on dialog open
 		{
+			IAiAnalysisService aiService = DeepVioletFactory.getAiService();
 			String threadPrefix = title.contains("Chat") ? "chat" : "report";
 			String threadName;
 			java.util.function.Supplier<String[]> fetcher;
-			if (currentProvider == AiAnalysisService.Provider.OLLAMA) {
+			if (currentProvider == AiProvider.OLLAMA) {
 				threadName = threadPrefix + "-ollama-model-fetch-init";
-				fetcher = () -> AiAnalysisService.fetchOllamaModels(savedEndpoint);
-			} else if (currentProvider == AiAnalysisService.Provider.ANTHROPIC) {
+				fetcher = () -> aiService.fetchModels(AiProvider.OLLAMA, null, savedEndpoint);
+			} else if (currentProvider == AiProvider.ANTHROPIC) {
 				threadName = threadPrefix + "-anthropic-model-fetch-init";
-				fetcher = () -> AiAnalysisService.fetchAnthropicModels(savedApiKey);
+				fetcher = () -> aiService.fetchModels(AiProvider.ANTHROPIC, savedApiKey, null);
 			} else {
 				threadName = threadPrefix + "-openai-model-fetch-init";
-				fetcher = () -> AiAnalysisService.fetchOpenAIModels(savedApiKey);
+				fetcher = () -> aiService.fetchModels(AiProvider.OPENAI, savedApiKey, null);
 			}
 			new Thread(() -> {
 				String[] models = fetcher.get();
@@ -1426,9 +1485,9 @@ public class FontChooserDialog extends JDialog {
 		// Row 6: Test button and result
 		pc.gridx = 0; pc.gridy = 6;
 		section.add(btnTest, pc);
-		pc.gridx = 1; pc.gridwidth = 3; pc.fill = GridBagConstraints.HORIZONTAL; pc.weightx = 1.0;
+		pc.gridx = 1; pc.gridwidth = 3;
 		section.add(lblResult, pc);
-		pc.gridwidth = 1; pc.fill = GridBagConstraints.NONE; pc.weightx = 0;
+		pc.gridwidth = 1;
 
 		return section;
 	}
@@ -1451,20 +1510,21 @@ public class FontChooserDialog extends JDialog {
 			JComboBox<String> cmbModel, String section) {
 		cmbProvider.addActionListener(e -> {
 			String selected = (String) cmbProvider.getSelectedItem();
-			AiAnalysisService.Provider p = AiAnalysisService.Provider.fromDisplayName(selected);
-			boolean ollama = (p == AiAnalysisService.Provider.OLLAMA);
+			AiProvider p = AiProvider.fromDisplayName(selected);
+			boolean ollama = (p == AiProvider.OLLAMA);
 			lblKey.setVisible(!ollama);
 			txtKey.setVisible(!ollama);
 			lblEndpoint.setVisible(ollama);
 			txtEndpoint.setVisible(ollama);
 			String threadName = section + "-" + selected.toLowerCase() + "-model-fetch";
+			IAiAnalysisService aiService = DeepVioletFactory.getAiService();
 			java.util.function.Supplier<String[]> fetcher;
 			if (ollama) {
-				fetcher = () -> AiAnalysisService.fetchOllamaModels(txtEndpoint.getText());
-			} else if (p == AiAnalysisService.Provider.ANTHROPIC) {
-				fetcher = () -> AiAnalysisService.fetchAnthropicModels(new String(txtKey.getPassword()));
+				fetcher = () -> aiService.fetchModels(AiProvider.OLLAMA, null, txtEndpoint.getText());
+			} else if (p == AiProvider.ANTHROPIC) {
+				fetcher = () -> aiService.fetchModels(AiProvider.ANTHROPIC, new String(txtKey.getPassword()), null);
 			} else {
-				fetcher = () -> AiAnalysisService.fetchOpenAIModels(new String(txtKey.getPassword()));
+				fetcher = () -> aiService.fetchModels(AiProvider.OPENAI, new String(txtKey.getPassword()), null);
 			}
 			new Thread(() -> {
 				String[] models = fetcher.get();
@@ -1514,12 +1574,20 @@ public class FontChooserDialog extends JDialog {
 
 		new Thread(() -> {
 			try {
-				AiAnalysisService service = new AiAnalysisService();
-				String response = service.analyze(
-						"Respond with the single word: operational",
-						apiKey, provider, model, 32, 0.0,
-						"You are a connectivity test. Respond with exactly the word 'operational' and nothing else.",
-						endpointUrl);
+				AiConfig config = AiConfig.builder()
+						.provider(AiProvider.fromDisplayName(provider))
+						.apiKey(apiKey)
+						.model(model)
+						.maxTokens(32)
+						.temperature(0.0)
+						.systemPrompt("You are a connectivity test. Respond with exactly the word 'operational' and nothing else.")
+						.endpointUrl(endpointUrl)
+						.build();
+
+				IAiAnalysisService aiService = DeepVioletFactory.getAiService();
+				java.io.InputStream testStream = new java.io.ByteArrayInputStream(
+						"Respond with the single word: operational".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+				String response = aiService.analyze(testStream, config);
 
 				boolean ok = response.toLowerCase().contains("operational");
 				javax.swing.SwingUtilities.invokeLater(() -> {
@@ -1532,7 +1600,7 @@ public class FontChooserDialog extends JDialog {
 						lblResult.setText("Unexpected response: " + response.substring(0, Math.min(60, response.length())));
 					}
 				});
-			} catch (AiAnalysisService.AiAnalysisException ex) {
+			} catch (AiAnalysisException ex) {
 				javax.swing.SwingUtilities.invokeLater(() -> {
 					btnTest.setEnabled(chkEnabled.isSelected());
 					lblResult.setForeground(java.awt.Color.RED);
@@ -1550,6 +1618,28 @@ public class FontChooserDialog extends JDialog {
 		ac.gridx = 0;
 		ac.insets = new Insets(4, 6, 4, 6);
 
+		// ---- General panel ----
+		JPanel pnlGeneral = new JPanel(new GridBagLayout());
+		pnlGeneral.setBorder(BorderFactory.createTitledBorder("General"));
+		GridBagConstraints gc = new GridBagConstraints();
+		gc.gridx = 0;
+		gc.gridy = 0;
+		gc.anchor = GridBagConstraints.WEST;
+		gc.fill = GridBagConstraints.NONE;
+		gc.weightx = 0;
+		gc.insets = new Insets(4, 6, 4, 6);
+		chkSuppressSaveWarning = new JCheckBox("Suppress Save Scan Warning",
+				prefs.isSuppressSaveWarning());
+		pnlGeneral.add(chkSuppressSaveWarning, gc);
+		// Spacer absorbs extra width
+		gc.gridx = 1;
+		gc.weightx = 1.0;
+		gc.fill = GridBagConstraints.HORIZONTAL;
+		pnlGeneral.add(new JPanel(), gc);
+
+		ac.gridy = 0;
+		panel.add(pnlGeneral, ac);
+
 		// ---- Font panel ----
 		JPanel pnlAppFont = new JPanel(new GridBagLayout());
 		pnlAppFont.setBorder(BorderFactory.createTitledBorder("Application UI Font"));
@@ -1565,11 +1655,17 @@ public class FontChooserDialog extends JDialog {
 				.getAvailableFontFamilyNames();
 		cmbAppFontFamily = new JComboBox<>(families);
 		cmbAppFontFamily.setRenderer(createMonoTagRenderer());
+		cmbAppFontFamily.setPrototypeDisplayValue("Monospaced Extended");
 		cmbAppFontFamily.setSelectedItem(prefs.getAppFont().getFamily());
 		fc.gridx = 1;
-		fc.fill = GridBagConstraints.HORIZONTAL;
-		fc.weightx = 1.0;
+		fc.fill = GridBagConstraints.NONE;
+		fc.weightx = 0;
 		pnlAppFont.add(cmbAppFontFamily, fc);
+		// Spacer absorbs extra width
+		fc.gridx = 2;
+		fc.weightx = 1.0;
+		fc.fill = GridBagConstraints.HORIZONTAL;
+		pnlAppFont.add(new JPanel(), fc);
 
 		fc.gridx = 0;
 		fc.gridy = 1;
@@ -1586,11 +1682,12 @@ public class FontChooserDialog extends JDialog {
 		}
 		cmbAppFontSize.setEditable(true);
 		fc.gridx = 1;
-		fc.fill = GridBagConstraints.HORIZONTAL;
-		fc.weightx = 1.0;
+		fc.fill = GridBagConstraints.NONE;
+		fc.weightx = 0;
+		fc.anchor = GridBagConstraints.WEST;
 		pnlAppFont.add(cmbAppFontSize, fc);
 
-		ac.gridy = 0;
+		ac.gridy = 1;
 		panel.add(pnlAppFont, ac);
 
 		// ---- Colors panel ----
@@ -1608,8 +1705,12 @@ public class FontChooserDialog extends JDialog {
 				prefs.getAppForeground());
 		btnAppButtonFg = addColorRow(pnlAppColors, cc, 1, 2, "Button Fg:",
 				prefs.getAppButtonFg());
+		// Spacer absorbs extra width
+		cc.gridx = 4; cc.gridy = 0; cc.weightx = 1.0;
+		cc.fill = GridBagConstraints.HORIZONTAL;
+		pnlAppColors.add(new JPanel(), cc);
 
-		ac.gridy = 1;
+		ac.gridy = 2;
 		panel.add(pnlAppColors, ac);
 
 		// ---- Presets panel ----
@@ -1633,16 +1734,17 @@ public class FontChooserDialog extends JDialog {
 		apc.gridx = 2;
 		pnlAppPresets.add(btnAppDark, apc);
 
-		ac.gridy = 2;
+		ac.gridy = 3;
 		panel.add(pnlAppPresets, ac);
 
 		// Spacer
-		ac.gridy = 3;
+		ac.gridy = 4;
 		ac.weighty = 1.0;
 		ac.fill = GridBagConstraints.BOTH;
 		panel.add(new JPanel(), ac);
 
 		// ---- Listeners ----
+		chkSuppressSaveWarning.addActionListener(e -> syncPrefsFromControls());
 		cmbAppFontFamily.addActionListener(e -> {
 			if (applyingTheme) return;
 			prefs.setAppThemeCustom(true);
@@ -2154,6 +2256,9 @@ public class FontChooserDialog extends JDialog {
 		prefs.setRiskScale((Integer) spnRiskScale.getValue());
 		prefs.setWorkerThreads((Integer) spnWorkerThreads.getValue());
 		prefs.setThrottleDelayMs((Integer) spnThrottleDelayMs.getValue());
+
+		// General settings
+		prefs.setSuppressSaveWarning(chkSuppressSaveWarning.isSelected());
 
 		// Application theme
 		String appFamily = (String) cmbAppFontFamily.getSelectedItem();

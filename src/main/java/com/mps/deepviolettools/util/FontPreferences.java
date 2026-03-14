@@ -231,6 +231,7 @@ public class FontPreferences {
 	private static final String KEY_WINDOW_W = "window.width";
 	private static final String KEY_WINDOW_H = "window.height";
 	private static final String KEY_HARDWRAP_ENABLED = "hardwrap.enabled";
+	private static final String KEY_SUPPRESS_SAVE_WARNING = "general.suppressSaveWarning";
 	private static final String KEY_HARDWRAP_WIDTH = "hardwrap.width";
 	private static final String KEY_SAVE_LAST_FOLDER = "save.lastFolder";
 	private static final String KEY_SAVE_LAST_FORMAT = "save.lastFormat";
@@ -479,6 +480,7 @@ public class FontPreferences {
 	private Color riskInfo;
 	private boolean hardwrapEnabled;
 	private int hardwrapWidth;
+	private boolean suppressSaveWarning;
 
 	// Engine settings fields
 	private boolean sectionRiskAssessment = true;
@@ -513,10 +515,10 @@ public class FontPreferences {
 	private String aiApiKey = "";
 	private String aiModel = "claude-sonnet-4-5-20250929";
 	private int aiMaxTokens = 4096;
-	private double aiTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
-	private String aiSystemPrompt = AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
-	private String aiChatSystemPrompt = AiAnalysisService.DEFAULT_CHAT_SYSTEM_PROMPT;
-	private String aiEndpointUrl = AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
+	private double aiTemperature = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE;
+	private String aiSystemPrompt = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
+	private String aiChatSystemPrompt = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_CHAT_SYSTEM_PROMPT;
+	private String aiEndpointUrl = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
 	private boolean sectionAiEvaluation = false;
 
 	// AI chat configuration fields
@@ -525,8 +527,8 @@ public class FontPreferences {
 	private String aiChatApiKey = "";
 	private String aiChatModel = "claude-sonnet-4-5-20250929";
 	private int aiChatMaxTokens = 4096;
-	private double aiChatTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
-	private String aiChatEndpointUrl = AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
+	private double aiChatTemperature = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE;
+	private String aiChatEndpointUrl = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT;
 
 	// AI terminal color fields
 	private Color aiTerminalBg = DEFAULT_AI_TERMINAL_BG;
@@ -620,6 +622,8 @@ public class FontPreferences {
 
 		fp.hardwrapEnabled = "true".equalsIgnoreCase(
 				props.getProperty(KEY_HARDWRAP_ENABLED, "false"));
+		fp.suppressSaveWarning = "true".equalsIgnoreCase(
+				props.getProperty(KEY_SUPPRESS_SAVE_WARNING, "false"));
 		try {
 			fp.hardwrapWidth = Integer.parseInt(props.getProperty(
 					KEY_HARDWRAP_WIDTH, String.valueOf(DEFAULT_HARDWRAP_WIDTH)));
@@ -686,21 +690,21 @@ public class FontPreferences {
 		}
 		try {
 			fp.aiTemperature = Double.parseDouble(props.getProperty(KEY_AI_TEMPERATURE,
-					String.valueOf(AiAnalysisService.DEFAULT_TEMPERATURE)));
+					String.valueOf(com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE)));
 		} catch (NumberFormatException e) {
-			fp.aiTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
+			fp.aiTemperature = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE;
 		}
-		String savedPrompt = props.getProperty(KEY_AI_SYSTEM_PROMPT, AiAnalysisService.DEFAULT_SYSTEM_PROMPT);
+		String savedPrompt = props.getProperty(KEY_AI_SYSTEM_PROMPT, com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_SYSTEM_PROMPT);
 		// Migrate older prompt versions to current structured format
 		if ((savedPrompt.contains("1. **Executive Summary**") && savedPrompt.contains("Be concise but thorough."))
 				|| (savedPrompt.contains("[Critical Issues]") && savedPrompt.contains("CRITICAL: "))) {
-			savedPrompt = AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
+			savedPrompt = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_SYSTEM_PROMPT;
 		}
 		fp.aiSystemPrompt = savedPrompt;
 		fp.aiChatSystemPrompt = props.getProperty(KEY_AI_CHAT_SYSTEM_PROMPT,
-				AiAnalysisService.DEFAULT_CHAT_SYSTEM_PROMPT);
+				com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_CHAT_SYSTEM_PROMPT);
 		fp.aiEndpointUrl = props.getProperty(KEY_AI_ENDPOINT_URL,
-				AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT);
+				com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT);
 		fp.sectionAiEvaluation = "true".equalsIgnoreCase(
 				props.getProperty(KEY_SECTION_AI_EVALUATION, "false"));
 
@@ -715,12 +719,12 @@ public class FontPreferences {
 		}
 		try {
 			fp.aiChatTemperature = Double.parseDouble(props.getProperty(KEY_AI_CHAT_TEMPERATURE,
-					String.valueOf(AiAnalysisService.DEFAULT_TEMPERATURE)));
+					String.valueOf(com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE)));
 		} catch (NumberFormatException e) {
-			fp.aiChatTemperature = AiAnalysisService.DEFAULT_TEMPERATURE;
+			fp.aiChatTemperature = com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_TEMPERATURE;
 		}
 		fp.aiChatEndpointUrl = props.getProperty(KEY_AI_CHAT_ENDPOINT_URL,
-				AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT);
+				com.mps.deepviolet.api.ai.AiAnalysisService.DEFAULT_OLLAMA_ENDPOINT);
 		// Migration: if chat keys absent but report AI was enabled, enable chat too
 		if (props.getProperty(KEY_AI_CHAT_ENABLED) == null) {
 			fp.aiChatEnabled = fp.aiReportEnabled;
@@ -867,6 +871,7 @@ public class FontPreferences {
 		props.setProperty(KEY_COLOR_RISK_LOW, encodeColor(fp.riskLow));
 		props.setProperty(KEY_COLOR_RISK_INFO, encodeColor(fp.riskInfo));
 		props.setProperty(KEY_HARDWRAP_ENABLED, String.valueOf(fp.hardwrapEnabled));
+		props.setProperty(KEY_SUPPRESS_SAVE_WARNING, String.valueOf(fp.suppressSaveWarning));
 		props.setProperty(KEY_HARDWRAP_WIDTH, String.valueOf(fp.hardwrapWidth));
 
 		// Engine settings
@@ -1018,6 +1023,7 @@ public class FontPreferences {
 		fp.riskInfo = DEFAULT_RISK_INFO;
 		fp.hardwrapEnabled = false;
 		fp.hardwrapWidth = DEFAULT_HARDWRAP_WIDTH;
+		fp.suppressSaveWarning = false;
 		fp.cardFont = new Font(DEFAULT_CARD_FONT_NAME, Font.PLAIN, DEFAULT_CARD_FONT_SIZE);
 		fp.cardBadgeSize = DEFAULT_CARD_BADGE_SIZE;
 		fp.cardBg = DEFAULT_CARD_BG;
@@ -1058,6 +1064,7 @@ public class FontPreferences {
 		fp.riskInfo = new Color(0x05, 0x50, 0xAE);
 		fp.hardwrapEnabled = true;
 		fp.hardwrapWidth = 90;
+		fp.suppressSaveWarning = false;
 		fp.cardFont = new Font(DEFAULT_CARD_FONT_NAME, Font.PLAIN, DEFAULT_CARD_FONT_SIZE);
 		fp.cardBadgeSize = DEFAULT_CARD_BADGE_SIZE;
 		fp.cardBg = new Color(0xE8, 0xE8, 0xE8);
@@ -1764,6 +1771,16 @@ public class FontPreferences {
 		this.hardwrapEnabled = hardwrapEnabled;
 	}
 
+	/** @return true if the unencrypted save warning is suppressed */
+	public boolean isSuppressSaveWarning() {
+		return suppressSaveWarning;
+	}
+
+	/** @param suppress true to suppress the unencrypted save warning */
+	public void setSuppressSaveWarning(boolean suppress) {
+		this.suppressSaveWarning = suppress;
+	}
+
 	/** @return the hard wrap width in characters */
 	public int getHardwrapWidth() {
 		return hardwrapWidth;
@@ -2364,37 +2381,29 @@ public class FontPreferences {
 	 * automatically.
 	 */
 	public static void ensureEncryptionSeed() {
+		// Check local properties for seed to migrate before delegating
 		Properties globalProps = loadGlobalProperties();
-		if (globalProps.getProperty(KEY_ENCRYPTION_SEED) != null) {
-			return;
-		}
-
-		// Migrate seed from old location if present
-		Properties localProps = loadProperties();
-		String existingSeed = localProps.getProperty(KEY_ENCRYPTION_SEED);
-		if (existingSeed != null) {
-			globalProps.setProperty(KEY_ENCRYPTION_SEED, existingSeed);
-			saveGlobalProperties(globalProps);
-			// Remove from local properties
-			localProps.remove(KEY_ENCRYPTION_SEED);
-			File dir = getHomeDir();
-			dir.mkdirs();
-			File file = new File(dir, PROPS_FILE);
-			try (FileOutputStream out = new FileOutputStream(file)) {
-				localProps.store(out, "DeepViolet user preferences");
-			} catch (IOException e) {
-				logger.error("Failed to remove seed from local properties", e);
+		if (globalProps.getProperty(KEY_ENCRYPTION_SEED) == null) {
+			// Migrate seed from old location if present
+			Properties localProps = loadProperties();
+			String existingSeed = localProps.getProperty(KEY_ENCRYPTION_SEED);
+			if (existingSeed != null) {
+				globalProps.setProperty(KEY_ENCRYPTION_SEED, existingSeed);
+				saveGlobalProperties(globalProps);
+				localProps.remove(KEY_ENCRYPTION_SEED);
+				File dir = getHomeDir();
+				dir.mkdirs();
+				File file = new File(dir, PROPS_FILE);
+				try (FileOutputStream out = new FileOutputStream(file)) {
+					localProps.store(out, "DeepViolet user preferences");
+				} catch (IOException e) {
+					logger.error("Failed to remove seed from local properties", e);
+				}
+				logger.info("Encryption seed migrated to global properties");
+				return;
 			}
-			logger.info("Encryption seed migrated to global properties");
-			return;
 		}
-
-		// Generate a new seed
-		byte[] seed = new byte[32]; // AES-256
-		new SecureRandom().nextBytes(seed);
-		globalProps.setProperty(KEY_ENCRYPTION_SEED, Base64.getEncoder().encodeToString(seed));
-		saveGlobalProperties(globalProps);
-		logger.info("Encryption seed generated");
+		com.mps.deepviolet.util.CryptoUtils.ensureEncryptionSeed();
 	}
 
 	/**
@@ -2499,72 +2508,32 @@ public class FontPreferences {
 	 * if no seed has been generated yet.
 	 */
 	static byte[] getEncryptionSeed() {
-		String seedB64 = loadGlobalProperties().getProperty(KEY_ENCRYPTION_SEED);
-		if (seedB64 == null) {
-			return null;
-		}
-		return Base64.getDecoder().decode(seedB64);
+		return com.mps.deepviolet.util.CryptoUtils.getEncryptionSeed();
 	}
 
 	/**
 	 * AES-256-GCM encrypt arbitrary bytes.
-	 * Returns IV (12 bytes) || ciphertext || auth tag (16 bytes).
+	 * Delegates to {@link com.mps.deepviolet.util.CryptoUtils#encryptBytes(byte[], byte[])}.
 	 */
 	static byte[] encryptBytes(byte[] plaintext, byte[] key) throws Exception {
-		SecureRandom sr = new SecureRandom();
-		byte[] iv = new byte[GCM_IV_BYTES];
-		sr.nextBytes(iv);
-
-		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-		cipher.init(Cipher.ENCRYPT_MODE,
-				new SecretKeySpec(key, "AES"),
-				new GCMParameterSpec(GCM_TAG_BITS, iv));
-		byte[] ciphertext = cipher.doFinal(plaintext);
-
-		byte[] result = new byte[iv.length + ciphertext.length];
-		System.arraycopy(iv, 0, result, 0, iv.length);
-		System.arraycopy(ciphertext, 0, result, iv.length, ciphertext.length);
-		return result;
+		return com.mps.deepviolet.util.CryptoUtils.encryptBytes(plaintext, key);
 	}
 
 	/**
 	 * AES-256-GCM decrypt arbitrary bytes.
-	 * Expects IV (12 bytes) || ciphertext || auth tag (16 bytes).
-	 * Throws if the auth tag validation fails (tampered data).
+	 * Delegates to {@link com.mps.deepviolet.util.CryptoUtils#decryptBytes(byte[], byte[])}.
 	 */
 	static byte[] decryptBytes(byte[] data, byte[] key) throws Exception {
-		byte[] iv = new byte[GCM_IV_BYTES];
-		System.arraycopy(data, 0, iv, 0, GCM_IV_BYTES);
-		byte[] ciphertext = new byte[data.length - GCM_IV_BYTES];
-		System.arraycopy(data, GCM_IV_BYTES, ciphertext, 0, ciphertext.length);
-
-		Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-		cipher.init(Cipher.DECRYPT_MODE,
-				new SecretKeySpec(key, "AES"),
-				new GCMParameterSpec(GCM_TAG_BITS, iv));
-		return cipher.doFinal(ciphertext);
+		return com.mps.deepviolet.util.CryptoUtils.decryptBytes(data, key);
 	}
 
 	/**
 	 * Compute the SHA-256 hash of the given data and return it as a
 	 * lowercase 64-character hex string.
-	 *
-	 * @return hex digest, or {@code null} on failure
+	 * Delegates to {@link com.mps.deepviolet.util.CryptoUtils#sha256Hex(byte[])}.
 	 */
 	public static String sha256Hex(byte[] data) {
-		try {
-			java.security.MessageDigest md =
-					java.security.MessageDigest.getInstance("SHA-256");
-			byte[] hash = md.digest(data);
-			StringBuilder sb = new StringBuilder(64);
-			for (byte b : hash) {
-				sb.append(String.format("%02x", b));
-			}
-			return sb.toString();
-		} catch (java.security.NoSuchAlgorithmException e) {
-			logger.error("SHA-256 not available", e);
-			return null;
-		}
+		return com.mps.deepviolet.util.CryptoUtils.sha256Hex(data);
 	}
 
 	/**

@@ -88,7 +88,6 @@ import com.mps.deepviolettools.job.ScanTask;
 import com.mps.deepviolettools.job.UIBackgroundScanTask;
 import com.mps.deepviolettools.ui.DockablePanel.DockPosition;
 import com.mps.deepviolettools.model.ScanResult;
-import com.mps.deepviolettools.model.ScanResult.SourceProvenance;
 import com.mps.deepviolettools.model.CipherDelta;
 import com.mps.deepviolettools.model.DeltaScanResult;
 import com.mps.deepviolettools.model.FingerprintDelta;
@@ -97,7 +96,12 @@ import com.mps.deepviolettools.model.HostDelta;
 import com.mps.deepviolettools.model.MapDelta;
 import com.mps.deepviolettools.model.RiskDelta;
 import com.mps.deepviolettools.model.ScanNode;
-import com.mps.deepviolettools.util.AiAnalysisService;
+import com.mps.deepviolet.api.DeepVioletFactory;
+import com.mps.deepviolet.api.ai.AiAnalysisException;
+import com.mps.deepviolet.api.ai.AiChatMessage;
+import com.mps.deepviolet.api.ai.AiConfig;
+import com.mps.deepviolet.api.ai.AiProvider;
+import com.mps.deepviolet.api.ai.IAiAnalysisService;
 import com.mps.deepviolettools.util.DeltaScanner;
 import com.mps.deepviolettools.util.FontPreferences;
 import com.mps.deepviolettools.util.ReportExporter;
@@ -133,7 +137,7 @@ public class MainFrm extends JFrame {
 	private TerminalPanel aiTerminal;
 	private JTextField txtAiInput;
 	private JButton btnAiSend;
-	private java.util.List<AiAnalysisService.ChatMessage> chatHistory = new java.util.ArrayList<>();
+	private java.util.List<AiChatMessage> chatHistory = new java.util.ArrayList<>();
 	private Timer aiDotTimer;
 	private int aiDotCount;
 
@@ -213,7 +217,7 @@ public class MainFrm extends JFrame {
 	private JSplitPane externalDetailSplit;
 	private JSplitPane splitScan;
 	private List<String[]> scanTargetHistory;
-	private SourceProvenance scanTargetProvenance;
+	private String scanTargetFileName;
 	private JMenuItem modeMenuItem;
 
 	/**
@@ -2053,17 +2057,7 @@ public class MainFrm extends JFrame {
 		int result = chooser.showOpenDialog(this);
 		if (result == JFileChooser.APPROVE_OPTION) {
 			File selected = chooser.getSelectedFile();
-			try {
-				byte[] rawBytes = java.nio.file.Files.readAllBytes(selected.toPath());
-				String sha = FontPreferences.sha256Hex(rawBytes);
-				scanTargetProvenance = new SourceProvenance(
-						selected.getName(), selected.getAbsolutePath(), sha);
-			} catch (IOException ex) {
-				JOptionPane.showMessageDialog(this,
-						"Error reading file: " + ex.getMessage(),
-						"Load Error", JOptionPane.ERROR_MESSAGE);
-				return;
-			}
+			scanTargetFileName = selected.getName();
 			try (BufferedReader br = new BufferedReader(new FileReader(selected))) {
 				StringBuilder sb = new StringBuilder();
 				String line;
@@ -2249,8 +2243,8 @@ public class MainFrm extends JFrame {
 		// Save target history before scanning
 		String targetText0 = txtTargets.getText();
 		int targetCount = TargetParser.parse(targetText0).size();
-		String histLabel = (scanTargetProvenance != null)
-				? scanTargetProvenance.getFileName()
+		String histLabel = (scanTargetFileName != null)
+				? scanTargetFileName
 				: "Manual (" + targetCount + " targets)";
 		scanTargetHistory.removeIf(e -> e[1].equals(targetText0));
 		scanTargetHistory.add(0, new String[] { histLabel, targetText0 });
@@ -2435,10 +2429,7 @@ public class MainFrm extends JFrame {
 	 */
 	private void onScanComplete() {
 		ScanResult result = currentScanTask.getResult();
-		if (scanTargetProvenance != null) {
-			result.setTargetSource(scanTargetProvenance);
-			scanTargetProvenance = null;
-		}
+		scanTargetFileName = null;
 		currentScanResult = result;
 
 		// Update active scan indicator
@@ -2837,7 +2828,10 @@ public class MainFrm extends JFrame {
 	}
 
 	/**
-	 * Save the current scan result as an encrypted .dvscan file.
+	 * Save the current scan result as a .dvscan file.
+	 * Shows a save dialog with encryption mode selection:
+	 * plain text, host locked (machine key only), or
+	 * password locked (machine key + transfer password).
 	 */
 	private void onSaveScan() {
 		if (currentScanResult == null) return;
@@ -2851,6 +2845,50 @@ public class MainFrm extends JFrame {
 		chooser.setSelectedFile(new File(scansDir, defaultName));
 		chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
 				"DeepViolet Scan Files (*.dvscan)", "dvscan"));
+
+		// Encryption mode accessory panel
+		javax.swing.JPanel modePanel = new javax.swing.JPanel();
+		modePanel.setLayout(new javax.swing.BoxLayout(modePanel, javax.swing.BoxLayout.Y_AXIS));
+		modePanel.setBorder(javax.swing.BorderFactory.createCompoundBorder(
+				javax.swing.BorderFactory.createMatteBorder(1, 0, 0, 0, java.awt.Color.GRAY),
+				javax.swing.BorderFactory.createEmptyBorder(6, 4, 4, 4)));
+
+		javax.swing.JLabel lblTitle = new javax.swing.JLabel("Encryption:");
+		lblTitle.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+		lblTitle.setBorder(javax.swing.BorderFactory.createEmptyBorder(0, 0, 4, 0));
+		modePanel.add(lblTitle);
+
+		ButtonGroup encGroup = new ButtonGroup();
+		javax.swing.JRadioButton rbPlain = new javax.swing.JRadioButton("Unencrypted JSON");
+		javax.swing.JRadioButton rbHostLocked = new javax.swing.JRadioButton("Host locked");
+		javax.swing.JRadioButton rbPasswordLocked = new javax.swing.JRadioButton("Password locked");
+		encGroup.add(rbPlain);
+		encGroup.add(rbHostLocked);
+		encGroup.add(rbPasswordLocked);
+		rbHostLocked.setSelected(true);
+
+		rbPlain.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+		rbHostLocked.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+		rbPasswordLocked.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+		modePanel.add(rbPlain);
+		modePanel.add(rbHostLocked);
+		modePanel.add(rbPasswordLocked);
+
+		modePanel.add(javax.swing.Box.createVerticalStrut(4));
+
+		javax.swing.JPasswordField txtPassword = new javax.swing.JPasswordField(16);
+		txtPassword.setEnabled(false);
+		txtPassword.setMaximumSize(new java.awt.Dimension(Integer.MAX_VALUE,
+				txtPassword.getPreferredSize().height));
+		txtPassword.setAlignmentX(java.awt.Component.LEFT_ALIGNMENT);
+		modePanel.add(txtPassword);
+
+		rbPasswordLocked.addActionListener(e -> txtPassword.setEnabled(true));
+		rbHostLocked.addActionListener(e -> { txtPassword.setEnabled(false); txtPassword.setText(""); });
+		rbPlain.addActionListener(e -> { txtPassword.setEnabled(false); txtPassword.setText(""); });
+
+		chooser.setAccessory(modePanel);
+
 		int ret = chooser.showSaveDialog(this);
 		if (ret != JFileChooser.APPROVE_OPTION) return;
 
@@ -2862,10 +2900,33 @@ public class MainFrm extends JFrame {
 		}
 
 		try {
-			SourceProvenance scanProv = ReportExporter.saveScanFile(file, currentScanResult);
-			currentScanResult.setScanSource(scanProv);
+			com.mps.deepviolet.persist.ScanFileMode mode;
+			char[] password = null;
+			if (rbPlain.isSelected()) {
+				if (!themePrefs.isSuppressSaveWarning()) {
+					int warn = JOptionPane.showOptionDialog(this,
+							"WARNING: Unencrypted scan data is provided for research\n"
+							+ "purposes but may contain sensitive information.\n"
+							+ "Do you wish to proceed?",
+							"Save Warning", JOptionPane.OK_CANCEL_OPTION,
+							JOptionPane.WARNING_MESSAGE, null,
+							new Object[] { "OK", "Cancel" }, "Cancel");
+					if (warn != 0) return;
+				}
+				mode = com.mps.deepviolet.persist.ScanFileMode.PLAIN_TEXT;
+			} else if (rbPasswordLocked.isSelected()
+					&& txtPassword.getPassword().length > 0) {
+				mode = com.mps.deepviolet.persist.ScanFileMode.PASSWORD_LOCKED;
+				password = txtPassword.getPassword();
+			} else {
+				mode = com.mps.deepviolet.persist.ScanFileMode.HOST_LOCKED;
+			}
+			String scanId = ReportExporter.saveScanFile(
+					file, currentScanResult, mode, password);
+			currentScanResult.setScanId(scanId);
 			txtActiveScan.setText("Active Scan: " + file.getAbsolutePath());
-			setStatusTemporary(STATUS_HDR + "Scan saved: " + file.getName());
+			setStatusTemporary(STATUS_HDR + "Scan saved: " + file.getName()
+					+ " (" + mode.getDisplayName().toLowerCase() + ")");
 		} catch (IOException ex) {
 			JOptionPane.showMessageDialog(this,
 					"Error saving scan: " + ex.getMessage(),
@@ -2876,6 +2937,8 @@ public class MainFrm extends JFrame {
 	/**
 	 * Load a previously saved scan file and display results.
 	 * Accepts both encrypted .dvscan files and legacy .dvscan.json files.
+	 * If the file requires a transfer password (cross-machine load),
+	 * a password dialog is shown automatically.
 	 */
 	private void onLoadScan() {
 		JFileChooser chooser = new JFileChooser(scansDir);
@@ -2890,7 +2953,17 @@ public class MainFrm extends JFrame {
 			if (file.getName().endsWith(".dvscan.json")) {
 				result = ReportExporter.loadScanFromJson(file);
 			} else {
-				result = ReportExporter.loadScanFile(file);
+				result = ReportExporter.loadScanFile(file, () -> {
+					javax.swing.JPasswordField pwField = new javax.swing.JPasswordField();
+					int option = JOptionPane.showConfirmDialog(this,
+							new Object[]{"This scan file requires a transfer password:", pwField},
+							"Enter Transfer Password",
+							JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+					if (option != JOptionPane.OK_OPTION) {
+						throw new java.io.IOException("Password entry cancelled");
+					}
+					return pwField.getPassword();
+				});
 			}
 			currentScanResult = result;
 			txtActiveScan.setText("Active Scan: " + file.getAbsolutePath());
@@ -3451,7 +3524,7 @@ public class MainFrm extends JFrame {
 		}
 
 		// Add to chat history
-		chatHistory.add(new AiAnalysisService.ChatMessage("user", userText));
+		chatHistory.add(new AiChatMessage("user", userText));
 
 		// Disable input while waiting
 		txtAiInput.setEnabled(false);
@@ -3473,16 +3546,22 @@ public class MainFrm extends JFrame {
 		String finalSystemContext = systemContext;
 		new Thread(() -> {
 			try {
-				AiAnalysisService service = new AiAnalysisService();
-				String response = service.chat(
-						chatHistory, themePrefs.getAiChatApiKey(),
-						themePrefs.getAiChatProvider(), themePrefs.getAiChatModel(),
-						themePrefs.getAiChatMaxTokens(), themePrefs.getAiChatTemperature(),
-						finalSystemContext, themePrefs.getAiChatEndpointUrl());
+				AiConfig config = AiConfig.builder()
+						.provider(AiProvider.fromDisplayName(themePrefs.getAiChatProvider()))
+						.apiKey(themePrefs.getAiChatApiKey())
+						.model(themePrefs.getAiChatModel())
+						.maxTokens(themePrefs.getAiChatMaxTokens())
+						.temperature(themePrefs.getAiChatTemperature())
+						.systemPrompt(finalSystemContext)
+						.endpointUrl(themePrefs.getAiChatEndpointUrl())
+						.build();
+
+				IAiAnalysisService aiService = DeepVioletFactory.getAiService();
+				String response = aiService.chat(chatHistory, config);
 
 				// Truncate to 5 sentences BEFORE logging or storing in history
 				String cleaned = stripMarkdown(response);
-				chatHistory.add(new AiAnalysisService.ChatMessage("assistant", cleaned));
+				chatHistory.add(new AiChatMessage("assistant", cleaned));
 				chatLog.info("AI> {}", cleaned);
 
 				javax.swing.SwingUtilities.invokeLater(() -> {
@@ -3493,7 +3572,7 @@ public class MainFrm extends JFrame {
 					btnAiSend.setEnabled(true);
 					txtAiInput.requestFocusInWindow();
 				});
-			} catch (AiAnalysisService.AiAnalysisException ex) {
+			} catch (AiAnalysisException ex) {
 				javax.swing.SwingUtilities.invokeLater(() -> {
 					aiDotTimer.stop();
 					// Clear the "AI> ..." line, rewrite with error

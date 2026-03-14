@@ -12,7 +12,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.mps.deepviolettools.model.ScanResult;
 import com.mps.deepviolettools.model.ScanResult.HostResult;
-import com.mps.deepviolettools.model.ScanResult.SourceProvenance;
 
 /**
  * Unit tests for {@link ReportExporter}, including host index methods
@@ -195,8 +194,8 @@ class ReportExporterTest {
         assertEquals(0x56, data[1] & 0xFF);
         assertEquals(0x53, data[2] & 0xFF);
         assertEquals(0x43, data[3] & 0xFF);
-        // Version = 0x01
-        assertEquals(0x01, data[4] & 0xFF);
+        // Version = 0x02 (v2 envelope encryption)
+        assertEquals(0x02, data[4] & 0xFF);
     }
 
     @Test
@@ -212,8 +211,9 @@ class ReportExporterTest {
 
         IOException ex = assertThrows(IOException.class,
                 () -> ReportExporter.loadScanFile(file));
-        assertTrue(ex.getMessage().contains("tampered"),
-                "Should mention tampering: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("tampered")
+                        || ex.getMessage().contains("decrypt"),
+                "Should mention tampering or decryption failure: " + ex.getMessage());
     }
 
     @Test
@@ -247,8 +247,10 @@ class ReportExporterTest {
 
         IOException ex = assertThrows(IOException.class,
                 () -> ReportExporter.loadScanFile(file));
-        assertTrue(ex.getMessage().contains("bad magic"),
-                "Should mention bad magic: " + ex.getMessage());
+        assertTrue(ex.getMessage().contains("bad magic")
+                        || ex.getMessage().contains("neither encrypted")
+                        || ex.getMessage().contains("not valid JSON"),
+                "Should mention format error: " + ex.getMessage());
     }
 
     @Test
@@ -256,7 +258,7 @@ class ReportExporterTest {
         File file = new File(tempDir, "badversion.dvscan");
         try {
             Files.write(file.toPath(), new byte[] {
-                    0x44, 0x56, 0x53, 0x43, 0x02, // DVSC + version 2
+                    0x44, 0x56, 0x53, 0x43, 0x03, // DVSC + version 3 (unsupported)
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -274,63 +276,32 @@ class ReportExporterTest {
     // ---- provenance tests ----
 
     @Test
-    void saveScanFile_returnsProvenance() throws IOException {
+    void saveScanFile_returnsScanId() throws IOException {
         ScanResult result = makeScanResult("https://example.com:443/");
         File file = new File(tempDir, "prov.dvscan");
-        SourceProvenance prov = ReportExporter.saveScanFile(file, result);
-        assertNotNull(prov);
-        assertEquals("prov.dvscan", prov.getFileName());
-        assertEquals(file.getAbsolutePath(), prov.getFilePath());
-        assertNotNull(prov.getSha256());
-        assertEquals(64, prov.getSha256().length());
+        String scanId = ReportExporter.saveScanFile(file, result);
+        assertNotNull(scanId);
+        assertEquals(64, scanId.length());
     }
 
     @Test
-    void loadScanFile_setsScanProvenance() throws IOException {
+    void loadScanFile_setsScanId() throws IOException {
         ScanResult result = makeScanResult("https://example.com:443/");
         File file = new File(tempDir, "scan-prov.dvscan");
         ReportExporter.saveScanFile(file, result);
 
         ScanResult loaded = ReportExporter.loadScanFile(file);
-        assertNotNull(loaded.getScanSource());
-        assertEquals("scan-prov.dvscan", loaded.getScanSource().getFileName());
-        assertNotNull(loaded.getScanSource().getSha256());
-        assertEquals(64, loaded.getScanSource().getSha256().length());
-    }
-
-    @Test
-    void saveScanFile_roundTrip_preservesTargetProvenance() throws IOException {
-        ScanResult result = makeScanResult("https://example.com:443/");
-        result.setTargetSource(new SourceProvenance(
-                "targets.txt", "/tmp/targets.txt",
-                "abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234"));
-        File file = new File(tempDir, "target-prov.dvscan");
-        ReportExporter.saveScanFile(file, result);
-
-        ScanResult loaded = ReportExporter.loadScanFile(file);
-        assertNotNull(loaded.getTargetSource());
-        assertEquals("targets.txt", loaded.getTargetSource().getFileName());
-        assertEquals("/tmp/targets.txt", loaded.getTargetSource().getFilePath());
-        assertEquals("abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
-                loaded.getTargetSource().getSha256());
+        assertNotNull(loaded.getScanId());
+        assertEquals(64, loaded.getScanId().length());
     }
 
     @Test
     void buildProvenanceText_formatsCorrectly() {
         ScanResult result = makeScanResult("https://example.com:443/");
-        result.setTargetSource(new SourceProvenance(
-                "targets.txt", "/data/targets.txt",
-                "aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222"));
-        result.setScanSource(new SourceProvenance(
-                "scan.dvscan", "/data/scan.dvscan",
-                "1111aaaa2222bbbb3333cccc4444dddd5555eeee6666ffff1111aaaa2222bbbb"));
+        result.setScanId("aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222");
         String text = ReportExporter.buildProvenanceText(result);
-        assertTrue(text.contains("Target Source:"), "Should contain 'Target Source:'");
-        assertTrue(text.contains("Scan File:"), "Should contain 'Scan File:'");
-        assertTrue(text.contains("Target SHA-256:"), "Should contain 'Target SHA-256:'");
-        assertTrue(text.contains("Scan SHA-256:"), "Should contain 'Scan SHA-256:'");
-        assertTrue(text.contains("targets.txt"));
-        assertTrue(text.contains("scan.dvscan"));
+        assertTrue(text.contains("Scan ID:"), "Should contain 'Scan ID:'");
+        assertTrue(text.contains("aaaa1111bbbb2222cccc3333dddd4444eeee5555ffff6666aaaa1111bbbb2222"));
     }
 
     // ---- helpers ----

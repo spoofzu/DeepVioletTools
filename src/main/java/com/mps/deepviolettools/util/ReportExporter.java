@@ -2,7 +2,6 @@ package com.mps.deepviolettools.util;
 
 import java.awt.Color;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -15,13 +14,11 @@ import java.util.Map;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.mps.deepviolet.api.ICipherSuite;
 import com.mps.deepviolet.api.IRiskScore;
 import com.mps.deepviolettools.job.UIBackgroundScanTask;
 import com.mps.deepviolettools.model.ScanResult;
 import com.mps.deepviolettools.model.ScanResult.HostResult;
-import com.mps.deepviolettools.model.ScanResult.SourceProvenance;
 import com.mps.deepviolettools.model.CipherDelta;
 import com.mps.deepviolettools.model.DeltaDirection;
 import com.mps.deepviolettools.model.DeltaHeatMapBuilder;
@@ -224,7 +221,7 @@ public class ReportExporter {
 	 * become nested objects, key-value pairs become properties, and
 	 * warnings/content become arrays.
 	 */
-	static Map<String, Object> toJsonMap(ScanNode root) {
+	public static Map<String, Object> toJsonMap(ScanNode root) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("report_version", UIBackgroundScanTask.REPORT_VERSION);
 
@@ -1729,12 +1726,8 @@ public class ReportExporter {
 		jsonMap.put("success_count", result.getSuccessCount());
 		jsonMap.put("error_count", result.getErrorCount());
 
-		if (result.getTargetSource() != null) {
-			Map<String, String> ts = new LinkedHashMap<>();
-			ts.put("file_name", result.getTargetSource().getFileName());
-			ts.put("file_path", result.getTargetSource().getFilePath());
-			ts.put("sha256", result.getTargetSource().getSha256());
-			jsonMap.put("target_source", ts);
+		if (result.getScanId() != null) {
+			jsonMap.put("scan_id", result.getScanId());
 		}
 
 		List<Map<String, Object>> hosts = new ArrayList<>();
@@ -1962,131 +1955,23 @@ public class ReportExporter {
 	/**
 	 * Load scan results from a JSON file previously saved by
 	 * {@link #saveScanAsJson(File, ScanResult)}.
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO#fromJson(String)}.
 	 */
 	public static ScanResult loadScanFromJson(File file) throws IOException {
-		Gson gson = new Gson();
-		Map<String, Object> jsonMap;
-		try (FileReader reader = new FileReader(file)) {
-			jsonMap = gson.fromJson(reader,
-					new TypeToken<Map<String, Object>>() {}.getType());
-		}
-		return parseScanJsonMap(jsonMap);
+		String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+		com.mps.deepviolet.persist.ScanSnapshot snapshot =
+				com.mps.deepviolet.persist.ScanFileIO.fromJson(json);
+		return ScanResult.fromSnapshot(snapshot);
 	}
 
 	/**
 	 * Load scan results from a JSON input stream (e.g. classpath resource).
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO#fromJson(java.io.InputStream)}.
 	 */
 	public static ScanResult loadScanFromJson(java.io.InputStream in) throws IOException {
-		Gson gson = new Gson();
-		Map<String, Object> jsonMap;
-		try (java.io.InputStreamReader reader = new java.io.InputStreamReader(in,
-				java.nio.charset.StandardCharsets.UTF_8)) {
-			jsonMap = gson.fromJson(reader,
-					new TypeToken<Map<String, Object>>() {}.getType());
-		}
-		return parseScanJsonMap(jsonMap);
-	}
-
-	/**
-	 * Reconstruct a ScanResult from a deserialized JSON map.
-	 */
-	@SuppressWarnings("unchecked")
-	private static ScanResult parseScanJsonMap(Map<String, Object> jsonMap) {
-		ScanResult result = new ScanResult();
-		result.setTotalTargets(toInt(jsonMap.get("total_targets")));
-		result.setSuccessCount(toInt(jsonMap.get("success_count")));
-		result.setErrorCount(toInt(jsonMap.get("error_count")));
-
-		// Restore target provenance if present
-		@SuppressWarnings("unchecked")
-		Map<String, String> tsMap =
-				(Map<String, String>) jsonMap.get("target_source");
-		if (tsMap != null) {
-			result.setTargetSource(new SourceProvenance(
-					tsMap.get("file_name"),
-					tsMap.get("file_path"),
-					tsMap.get("sha256")));
-		}
-
-		List<Map<String, Object>> hosts =
-				(List<Map<String, Object>>) jsonMap.get("hosts");
-		if (hosts != null) {
-			for (Map<String, Object> hostMap : hosts) {
-				String targetUrl = (String) hostMap.get("target_url");
-				HostResult hr = new HostResult(targetUrl);
-
-				Boolean success = (Boolean) hostMap.get("success");
-				if (success != null && !success) {
-					hr.setErrorMessage((String) hostMap.get("error"));
-				}
-
-				// Security headers
-				Map<String, String> secHeaders =
-						toStringMap(hostMap.get("security_headers"));
-				if (secHeaders != null) hr.setSecurityHeaders(secHeaders);
-
-				// Connection properties
-				Map<String, String> connProps =
-						toStringMap(hostMap.get("connection_properties"));
-				if (connProps != null) hr.setConnProperties(connProps);
-
-				// HTTP headers
-				Map<String, String> httpHeaders =
-						toStringMap(hostMap.get("http_headers"));
-				if (httpHeaders != null) hr.setHttpHeaders(httpHeaders);
-
-				// TLS fingerprint
-				if (hostMap.get("tls_fingerprint") != null) {
-					hr.setTlsFingerprint(String.valueOf(hostMap.get("tls_fingerprint")));
-				}
-
-				// Risk score
-				Map<String, Object> riskMap =
-						(Map<String, Object>) hostMap.get("risk_score");
-				if (riskMap != null) {
-					IRiskScore.ICategoryScore[] catScores =
-							parseCategoryScores(riskMap.get("categories"));
-					hr.setRiskScore(new LoadedRiskScore(
-							toInt(riskMap.get("total_score")),
-							IRiskScore.LetterGrade.valueOf(
-									(String) riskMap.get("letter_grade")),
-							IRiskScore.RiskLevel.valueOf(
-									(String) riskMap.get("risk_level")),
-							catScores));
-				}
-
-				// Ciphers
-				List<Map<String, String>> cipherList =
-						(List<Map<String, String>>) hostMap.get("ciphers");
-				if (cipherList != null) {
-					ICipherSuite[] ciphers = new ICipherSuite[cipherList.size()];
-					for (int i = 0; i < cipherList.size(); i++) {
-						Map<String, String> c = cipherList.get(i);
-						ciphers[i] = new LoadedCipherSuite(
-								c.get("name"), c.get("strength"), c.get("protocol"));
-					}
-					hr.setCiphers(ciphers);
-				}
-
-				// Scan report tree
-				Map<String, Object> scanReport =
-						(Map<String, Object>) hostMap.get("scan_report");
-				if (scanReport != null) {
-					hr.setScanTree(fromJsonMap(scanReport));
-				}
-
-				// Rule context for offline re-scoring
-				@SuppressWarnings("unchecked")
-				Map<String, Object> ruleCtxMap =
-						(Map<String, Object>) hostMap.get("rule_context");
-				if (ruleCtxMap != null) {
-					hr.setRuleContextMap(ruleCtxMap);
-				}
-
-				result.addResult(hr);
-			}
-		}
-		return result;
+		com.mps.deepviolet.persist.ScanSnapshot snapshot =
+				com.mps.deepviolet.persist.ScanFileIO.fromJson(in);
+		return ScanResult.fromSnapshot(snapshot);
 	}
 
 	// ---- Provenance ----
@@ -2096,23 +1981,13 @@ public class ReportExporter {
 	 * Returns an empty string if no provenance is available.
 	 */
 	public static String buildProvenanceText(ScanResult result) {
-		SourceProvenance ts = result.getTargetSource();
-		SourceProvenance ss = result.getScanSource();
-		if (ts == null && ss == null) return "";
+		String scanId = result.getScanId();
+		if (scanId == null) return "";
 
 		StringBuilder sb = new StringBuilder();
 		sb.append("Provenance\n");
 		sb.append("----------\n");
-		if (ts != null) {
-			sb.append("  Target Source: ").append(ts.getFileName()).append('\n');
-			sb.append("  Target Path:   ").append(ts.getFilePath()).append('\n');
-			sb.append("  Target SHA-256: ").append(ts.getSha256()).append('\n');
-		}
-		if (ss != null) {
-			sb.append("  Scan File:     ").append(ss.getFileName()).append('\n');
-			sb.append("  Scan Path:     ").append(ss.getFilePath()).append('\n');
-			sb.append("  Scan SHA-256:  ").append(ss.getSha256()).append('\n');
-		}
+		sb.append("  Scan ID: ").append(scanId).append('\n');
 		sb.append('\n');
 		return sb.toString();
 	}
@@ -2122,28 +1997,13 @@ public class ReportExporter {
 	 */
 	static void writeHtmlProvenance(PrintWriter p,
 			ScanResult result, String noticeColor) {
-		SourceProvenance ts = result.getTargetSource();
-		SourceProvenance ss = result.getScanSource();
-		if (ts == null && ss == null) return;
+		String scanId = result.getScanId();
+		if (scanId == null) return;
 
 		p.println("<span style=\"color:" + noticeColor + ";font-weight:bold\">"
 				+ "Provenance</span>");
-		if (ts != null) {
-			p.println("<span style=\"color:" + noticeColor + "\">"
-					+ "  Target Source: " + escapeHtml(ts.getFileName()) + "</span>");
-			p.println("<span style=\"color:" + noticeColor + "\">"
-					+ "  Target Path:   " + escapeHtml(ts.getFilePath()) + "</span>");
-			p.println("<span style=\"color:" + noticeColor + "\">"
-					+ "  Target SHA-256: " + escapeHtml(ts.getSha256()) + "</span>");
-		}
-		if (ss != null) {
-			p.println("<span style=\"color:" + noticeColor + "\">"
-					+ "  Scan File:     " + escapeHtml(ss.getFileName()) + "</span>");
-			p.println("<span style=\"color:" + noticeColor + "\">"
-					+ "  Scan Path:     " + escapeHtml(ss.getFilePath()) + "</span>");
-			p.println("<span style=\"color:" + noticeColor + "\">"
-					+ "  Scan SHA-256:  " + escapeHtml(ss.getSha256()) + "</span>");
-		}
+		p.println("<span style=\"color:" + noticeColor + "\">"
+				+ "  Scan ID: " + escapeHtml(scanId) + "</span>");
 		p.println("");
 	}
 
@@ -2153,131 +2013,109 @@ public class ReportExporter {
 	static void writePdfProvenance(com.lowagie.text.Document pdfDoc,
 			ScanResult result, float fontSize, float leading)
 			throws com.lowagie.text.DocumentException {
-		SourceProvenance ts = result.getTargetSource();
-		SourceProvenance ss = result.getScanSource();
-		if (ts == null && ss == null) return;
+		String scanId = result.getScanId();
+		if (scanId == null) return;
 
 		addPdfLine(pdfDoc, "Provenance", fontSize, leading, Color.BLACK, true);
-		if (ts != null) {
-			addPdfLine(pdfDoc, "  Target Source: " + ts.getFileName(),
-					fontSize, leading, Color.DARK_GRAY, false);
-			addPdfLine(pdfDoc, "  Target Path:   " + ts.getFilePath(),
-					fontSize, leading, Color.DARK_GRAY, false);
-			addPdfLine(pdfDoc, "  Target SHA-256: " + ts.getSha256(),
-					fontSize, leading, Color.DARK_GRAY, false);
-		}
-		if (ss != null) {
-			addPdfLine(pdfDoc, "  Scan File:     " + ss.getFileName(),
-					fontSize, leading, Color.DARK_GRAY, false);
-			addPdfLine(pdfDoc, "  Scan Path:     " + ss.getFilePath(),
-					fontSize, leading, Color.DARK_GRAY, false);
-			addPdfLine(pdfDoc, "  Scan SHA-256:  " + ss.getSha256(),
-					fontSize, leading, Color.DARK_GRAY, false);
-		}
+		addPdfLine(pdfDoc, "  Scan ID: " + scanId,
+				fontSize, leading, Color.DARK_GRAY, false);
 		addPdfLine(pdfDoc, " ", fontSize, leading, Color.DARK_GRAY, false);
 	}
 
-	// ---- Encrypted scan (.dvscan) ----
+	// ---- Scan file (.dvscan) ----
 
 	/**
-	 * Save scan results as an encrypted binary .dvscan file.
-	 * Format: DVSC magic (4 bytes) + version (1 byte) + AES-256-GCM encrypted payload.
-	 * The plaintext payload is the same JSON structure used by
-	 * {@link #saveScanAsJson(File, ScanResult)}.
+	 * Save scan results using the specified encryption mode.
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO}.
 	 *
-	 * @return provenance of the written file (name, path, SHA-256)
+	 * @param file     output file
+	 * @param result   scan data to save
+	 * @param mode     encryption mode (PLAIN_TEXT, HOST_LOCKED, PASSWORD_LOCKED)
+	 * @param password transfer password (required for PASSWORD_LOCKED, ignored otherwise)
+	 * @return scanId (SHA-256 hex of the written file)
+	 * @throws IOException on write or encryption failure
+	 */
+	public static String saveScanFile(File file, ScanResult result,
+			com.mps.deepviolet.persist.ScanFileMode mode, char[] password)
+			throws IOException {
+		byte[] key = null;
+		if (mode != com.mps.deepviolet.persist.ScanFileMode.PLAIN_TEXT) {
+			key = FontPreferences.getEncryptionSeed();
+			if (key == null) {
+				throw new IOException("Encryption seed not available. "
+						+ "Call FontPreferences.ensureEncryptionSeed() first.");
+			}
+		}
+
+		com.mps.deepviolet.persist.ScanSnapshot snapshot = result.toSnapshot();
+		String scanId = com.mps.deepviolet.persist.ScanFileIO.save(
+				file, snapshot, mode, key, password);
+		result.setScanId(scanId);
+		return scanId;
+	}
+
+	/**
+	 * Save scan results as a host-locked .dvscan file (machine key only).
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO}.
+	 *
+	 * @return scanId (SHA-256 hex of the written file)
 	 * @throws IOException if the encryption seed is not available or writing fails
 	 */
-	public static SourceProvenance saveScanFile(File file,
+	public static String saveScanFile(File file,
 			ScanResult result) throws IOException {
-		byte[] key = FontPreferences.getEncryptionSeed();
-		if (key == null) {
-			throw new IOException("Encryption seed not available. "
-					+ "Call FontPreferences.ensureEncryptionSeed() first.");
-		}
+		return saveScanFile(file, result,
+				com.mps.deepviolet.persist.ScanFileMode.HOST_LOCKED, null);
+	}
 
-		Gson gson = new GsonBuilder().setPrettyPrinting().create();
-		byte[] jsonBytes = buildScanJsonString(result, gson)
-				.getBytes(StandardCharsets.UTF_8);
-
-		byte[] encrypted;
-		try {
-			encrypted = FontPreferences.encryptBytes(jsonBytes, key);
-		} catch (Exception e) {
-			throw new IOException("Encryption failed: " + e.getMessage(), e);
-		}
-
-		byte[] output = new byte[DVSCAN_HEADER_SIZE + encrypted.length];
-		System.arraycopy(DVSCAN_MAGIC, 0, output, 0, DVSCAN_MAGIC.length);
-		output[DVSCAN_MAGIC.length] = DVSCAN_VERSION;
-		System.arraycopy(encrypted, 0, output, DVSCAN_HEADER_SIZE, encrypted.length);
-
-		Files.write(file.toPath(), output);
-
-		// Compute provenance of the written file
-		byte[] written = Files.readAllBytes(file.toPath());
-		String sha = FontPreferences.sha256Hex(written);
-		return new SourceProvenance(file.getName(),
-				file.getAbsolutePath(), sha);
+	/**
+	 * Save scan results as an encrypted .dvscan file with optional
+	 * password protection.
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO}.
+	 *
+	 * @return scanId (SHA-256 hex of the written file)
+	 * @throws IOException if the encryption seed is not available or writing fails
+	 */
+	public static String saveScanFile(File file,
+			ScanResult result, char[] password) throws IOException {
+		com.mps.deepviolet.persist.ScanFileMode mode =
+				(password != null && password.length > 0)
+				? com.mps.deepviolet.persist.ScanFileMode.PASSWORD_LOCKED
+				: com.mps.deepviolet.persist.ScanFileMode.HOST_LOCKED;
+		return saveScanFile(file, result, mode, password);
 	}
 
 	/**
 	 * Load scan results from an encrypted binary .dvscan file
 	 * previously saved by {@link #saveScanFile(File, ScanResult)}.
-	 * Validates the magic header, version, and GCM authentication tag.
-	 * Tampered files will throw an IOException.
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO}.
 	 *
 	 * @throws IOException if the file is invalid, tampered, or decryption fails
 	 */
 	public static ScanResult loadScanFile(File file) throws IOException {
-		byte[] data = Files.readAllBytes(file.toPath());
+		return loadScanFile(file, null);
+	}
 
-		if (data.length < DVSCAN_HEADER_SIZE) {
-			throw new IOException("File too small to be a valid .dvscan file");
-		}
-
-		// Validate magic
-		for (int i = 0; i < DVSCAN_MAGIC.length; i++) {
-			if (data[i] != DVSCAN_MAGIC[i]) {
-				throw new IOException("Invalid file: not a DeepViolet scan file "
-						+ "(bad magic header)");
-			}
-		}
-
-		// Validate version
-		if (data[DVSCAN_MAGIC.length] != DVSCAN_VERSION) {
-			throw new IOException("Unsupported .dvscan format version: "
-					+ (data[DVSCAN_MAGIC.length] & 0xFF));
-		}
-
+	/**
+	 * Load scan results from an encrypted binary .dvscan file with optional
+	 * password callback.
+	 * Delegates to {@link com.mps.deepviolet.persist.ScanFileIO}.
+	 *
+	 * @throws IOException if the file is invalid, tampered, or decryption fails
+	 */
+	public static ScanResult loadScanFile(File file,
+			com.mps.deepviolet.persist.ScanFileIO.PasswordCallback passwordCallback)
+			throws IOException {
 		byte[] key = FontPreferences.getEncryptionSeed();
-		if (key == null) {
-			throw new IOException("Encryption seed not available. "
-					+ "Cannot decrypt scan file.");
+		// key can be null — ScanFileIO handles null machine key for cross-machine load
+
+		com.mps.deepviolet.persist.ScanSnapshot snapshot;
+		if (passwordCallback != null) {
+			snapshot = com.mps.deepviolet.persist.ScanFileIO.load(file, key, passwordCallback);
+		} else {
+			snapshot = com.mps.deepviolet.persist.ScanFileIO.load(file, key);
 		}
 
-		byte[] encrypted = new byte[data.length - DVSCAN_HEADER_SIZE];
-		System.arraycopy(data, DVSCAN_HEADER_SIZE, encrypted, 0, encrypted.length);
-
-		byte[] jsonBytes;
-		try {
-			jsonBytes = FontPreferences.decryptBytes(encrypted, key);
-		} catch (Exception e) {
-			throw new IOException("Failed to decrypt scan file — "
-					+ "the file may be tampered or corrupted", e);
-		}
-
-		String json = new String(jsonBytes, StandardCharsets.UTF_8);
-		Gson gson = new Gson();
-		Map<String, Object> jsonMap = gson.fromJson(json,
-				new TypeToken<Map<String, Object>>() {}.getType());
-		ScanResult result = parseScanJsonMap(jsonMap);
-
-		// Compute scan file provenance
-		String sha = FontPreferences.sha256Hex(data);
-		result.setScanSource(new SourceProvenance(
-				file.getName(), file.getAbsolutePath(), sha));
-
+		ScanResult result = ScanResult.fromSnapshot(snapshot);
 		return result;
 	}
 
@@ -2286,7 +2124,7 @@ public class ReportExporter {
 	 * produced by {@link #toJsonMap(ScanNode)}.
 	 */
 	@SuppressWarnings("unchecked")
-	static ScanNode fromJsonMap(Map<String, Object> jsonMap) {
+	public static ScanNode fromJsonMap(Map<String, Object> jsonMap) {
 		ScanNode root = ScanNode.createRoot();
 
 		// Restore preamble (banner NOTICE/BLANK nodes) if present
@@ -2349,179 +2187,6 @@ public class ReportExporter {
 				parent.addKeyValue(key, String.valueOf(val));
 			}
 		}
-	}
-
-	private static int toInt(Object obj) {
-		if (obj instanceof Number) return ((Number) obj).intValue();
-		if (obj instanceof String) return Integer.parseInt((String) obj);
-		return 0;
-	}
-
-	private static double toDouble(Object obj) {
-		if (obj instanceof Number) return ((Number) obj).doubleValue();
-		if (obj instanceof String) return Double.parseDouble((String) obj);
-		return 0.0;
-	}
-
-	@SuppressWarnings("unchecked")
-	private static IRiskScore.ICategoryScore[] parseCategoryScores(Object obj) {
-		if (obj == null) return new IRiskScore.ICategoryScore[0];
-		List<Map<String, Object>> catList = (List<Map<String, Object>>) obj;
-		IRiskScore.ICategoryScore[] result =
-				new IRiskScore.ICategoryScore[catList.size()];
-		for (int i = 0; i < catList.size(); i++) {
-			Map<String, Object> catMap = catList.get(i);
-			IRiskScore.IDeduction[] deductions = parseDeductions(catMap.get("deductions"));
-			result[i] = new LoadedCategoryScore(
-					(String) catMap.get("category_key"),
-					(String) catMap.get("display_name"),
-					toInt(catMap.get("score")),
-					IRiskScore.RiskLevel.valueOf((String) catMap.get("risk_level")),
-					(String) catMap.get("summary"),
-					deductions);
-		}
-		return result;
-	}
-
-	@SuppressWarnings("unchecked")
-	private static IRiskScore.IDeduction[] parseDeductions(Object obj) {
-		if (obj == null) return new IRiskScore.IDeduction[0];
-		List<Map<String, Object>> dedList = (List<Map<String, Object>>) obj;
-		IRiskScore.IDeduction[] result = new IRiskScore.IDeduction[dedList.size()];
-		for (int i = 0; i < dedList.size(); i++) {
-			Map<String, Object> d = dedList.get(i);
-			result[i] = new LoadedDeduction(
-					(String) d.get("rule_id"),
-					(String) d.get("description"),
-					toDouble(d.get("score")),
-					(String) d.get("severity"),
-					Boolean.TRUE.equals(d.get("inconclusive")));
-		}
-		return result;
-	}
-
-	@SuppressWarnings("unchecked")
-	private static Map<String, String> toStringMap(Object obj) {
-		if (obj == null) return null;
-		Map<String, Object> raw = (Map<String, Object>) obj;
-		Map<String, String> result = new LinkedHashMap<>();
-		for (Map.Entry<String, Object> e : raw.entrySet()) {
-			result.put(e.getKey(), e.getValue() != null
-					? String.valueOf(e.getValue()) : null);
-		}
-		return result;
-	}
-
-	// ---- Stub implementations for loaded data ----
-
-	/**
-	 * Lightweight stub implementing {@link IRiskScore} for data loaded
-	 * from a saved JSON scan file.
-	 */
-	private static class LoadedRiskScore implements IRiskScore {
-		private final int totalScore;
-		private final LetterGrade letterGrade;
-		private final RiskLevel riskLevel;
-		private final ICategoryScore[] categories;
-
-		LoadedRiskScore(int totalScore, LetterGrade letterGrade,
-				RiskLevel riskLevel, ICategoryScore[] categories) {
-			this.totalScore = totalScore;
-			this.letterGrade = letterGrade;
-			this.riskLevel = riskLevel;
-			this.categories = categories != null ? categories : new ICategoryScore[0];
-		}
-
-		@Override public int getTotalScore() { return totalScore; }
-		@Override public LetterGrade getLetterGrade() { return letterGrade; }
-		@Override public RiskLevel getRiskLevel() { return riskLevel; }
-		@Override public ICategoryScore[] getCategoryScores() {
-			return categories;
-		}
-		@Override public ICategoryScore getCategoryScore(ScoreCategory category) {
-			for (ICategoryScore cs : categories) {
-				if (cs.getCategory() == category) return cs;
-			}
-			return null;
-		}
-		@Override public ICategoryScore getCategoryScore(String categoryKey) {
-			for (ICategoryScore cs : categories) {
-				if (cs.getCategoryKey().equals(categoryKey)) return cs;
-			}
-			return null;
-		}
-		@Override public String getHostUrl() { return null; }
-		@Override public IScoringDiagnostic[] getDiagnostics() {
-			return new IScoringDiagnostic[0];
-		}
-	}
-
-	/**
-	 * Lightweight stub implementing {@link IRiskScore.ICategoryScore}
-	 * for data loaded from a saved scan file.
-	 */
-	private static class LoadedCategoryScore implements IRiskScore.ICategoryScore {
-		private final String categoryKey;
-		private final String displayName;
-		private final int score;
-		private final IRiskScore.RiskLevel riskLevel;
-		private final String summary;
-		private final IRiskScore.IDeduction[] deductions;
-
-		LoadedCategoryScore(String categoryKey, String displayName, int score,
-				IRiskScore.RiskLevel riskLevel, String summary,
-				IRiskScore.IDeduction[] deductions) {
-			this.categoryKey = categoryKey;
-			this.displayName = displayName;
-			this.score = score;
-			this.riskLevel = riskLevel;
-			this.summary = summary;
-			this.deductions = deductions != null ? deductions : new IRiskScore.IDeduction[0];
-		}
-
-		@Override public IRiskScore.ScoreCategory getCategory() {
-			try {
-				return IRiskScore.ScoreCategory.valueOf(categoryKey);
-			} catch (IllegalArgumentException e) {
-				return IRiskScore.ScoreCategory.OTHER;
-			}
-		}
-		@Override public int getScore() { return score; }
-		@Override public IRiskScore.RiskLevel getRiskLevel() { return riskLevel; }
-		@Override public String getDisplayName() { return displayName; }
-		@Override public String getSummary() { return summary; }
-		@Override public IRiskScore.IDeduction[] getDeductions() { return deductions; }
-		@Override public String getCategoryKey() { return categoryKey; }
-		@Override public IRiskScore.IScoringDiagnostic[] getDiagnostics() {
-			return new IRiskScore.IScoringDiagnostic[0];
-		}
-	}
-
-	/**
-	 * Lightweight stub implementing {@link IRiskScore.IDeduction}
-	 * for data loaded from a saved scan file.
-	 */
-	private static class LoadedDeduction implements IRiskScore.IDeduction {
-		private final String ruleId;
-		private final String description;
-		private final double score;
-		private final String severity;
-		private final boolean inconclusive;
-
-		LoadedDeduction(String ruleId, String description, double score,
-				String severity, boolean inconclusive) {
-			this.ruleId = ruleId;
-			this.description = description;
-			this.score = score;
-			this.severity = severity;
-			this.inconclusive = inconclusive;
-		}
-
-		@Override public String getRuleId() { return ruleId; }
-		@Override public String getDescription() { return description; }
-		@Override public double getScore() { return score; }
-		@Override public String getSeverity() { return severity; }
-		@Override public boolean isInconclusive() { return inconclusive; }
 	}
 
 	// ---- Card summary export ----
@@ -3390,23 +3055,4 @@ public class ReportExporter {
 		}
 	}
 
-	/**
-	 * Lightweight stub implementing {@link ICipherSuite} for data loaded
-	 * from a saved JSON scan file.
-	 */
-	private static class LoadedCipherSuite implements ICipherSuite {
-		private final String name;
-		private final String strength;
-		private final String protocol;
-
-		LoadedCipherSuite(String name, String strength, String protocol) {
-			this.name = name;
-			this.strength = strength;
-			this.protocol = protocol;
-		}
-
-		@Override public String getSuiteName() { return name; }
-		@Override public String getStrengthEvaluation() { return strength; }
-		@Override public String getHandshakeProtocol() { return protocol; }
-	}
 }
