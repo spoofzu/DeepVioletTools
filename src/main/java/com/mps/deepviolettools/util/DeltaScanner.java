@@ -47,7 +47,7 @@ public class DeltaScanner {
                                            File baseFile, File targetFile) {
         DeltaScanResult result = new DeltaScanResult(
                 baseFile, targetFile,
-                base.getScanSource(), target.getScanSource(),
+                base.getScanId(), target.getScanId(),
                 base.getResults().size(), target.getResults().size());
 
         // Build lookup maps keyed by normalized URL

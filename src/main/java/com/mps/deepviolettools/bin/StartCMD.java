@@ -30,7 +30,6 @@ import com.mps.deepviolet.validate.ApiValidator;
 import com.mps.deepviolettools.job.ScanTask;
 import com.mps.deepviolettools.job.UIBackgroundScanTask;
 import com.mps.deepviolettools.model.ScanResult;
-import com.mps.deepviolettools.model.ScanResult.SourceProvenance;
 import com.mps.deepviolettools.util.FontPreferences;
 import com.mps.deepviolettools.util.LogUtils;
 import com.mps.deepviolettools.model.DeltaScanResult;
@@ -111,6 +110,10 @@ public class StartCMD {
 					"Optional, custom cipher map YAML file (replaces built-in).");
 			options.addOption(null, "riskrules", true,
 					"Optional, user risk rules YAML file (merged with system rules).");
+			options.addOption(null, "password-env", true,
+					"Optional, env var name containing transfer password for .dvscan files.");
+			options.addOption(null, "password-file", true,
+					"Optional, file containing transfer password for .dvscan files.");
 
 			// Mutually exclusive options
 			OptionGroup certsource = new OptionGroup();
@@ -243,6 +246,10 @@ public class StartCMD {
 				hm.append("Custom overlays:").append(EOL);
 				hm.append("--ciphermap <path> Custom cipher map YAML file (replaces built-in)").append(EOL);
 				hm.append("--riskrules <path> User risk rules YAML file (merged with system rules)").append(EOL);
+				hm.append("").append(EOL);
+				hm.append("Transfer password (for cross-machine .dvscan files):").append(EOL);
+				hm.append("--password-env <var> Env var name containing transfer password").append(EOL);
+				hm.append("--password-file <path> File containing transfer password").append(EOL);
 				hm.append("").append(EOL);
 				hm.append("Validation:").append(EOL);
 				hm.append("Ex: dvcli.jar --validate google.com").append(EOL);
@@ -567,7 +574,6 @@ public class StartCMD {
 
 		// Parse targets
 		List<String> targetUrls;
-		SourceProvenance targetProvenance = null;
 		if (cmdline.hasOption("scan")) {
 			targetUrls = TargetParser.parse(cmdline.getOptionValue("scan"));
 		} else {
@@ -577,10 +583,6 @@ public class StartCMD {
 				System.exit(-1);
 				return;
 			}
-			byte[] rawBytes = java.nio.file.Files.readAllBytes(targetFile.toPath());
-			String sha = FontPreferences.sha256Hex(rawBytes);
-			targetProvenance = new SourceProvenance(
-					targetFile.getName(), targetFile.getAbsolutePath(), sha);
 			targetUrls = TargetParser.parseFile(targetFile);
 		}
 
@@ -724,9 +726,6 @@ public class StartCMD {
 		scanThread.join();
 
 		ScanResult result = scanTask.getResult();
-		if (targetProvenance != null) {
-			result.setTargetSource(targetProvenance);
-		}
 		long finish = System.currentTimeMillis();
 
 		// Summary
@@ -840,8 +839,9 @@ public class StartCMD {
 		logger.info("Delta scan: comparing " + baseFile.getName()
 				+ " vs " + targetFile.getName());
 
-		ScanResult base = ReportExporter.loadScanFile(baseFile);
-		ScanResult target = ReportExporter.loadScanFile(targetFile);
+		com.mps.deepviolet.persist.ScanFileIO.PasswordCallback pwCb = buildPasswordCallback(cmdline);
+		ScanResult base = ReportExporter.loadScanFile(baseFile, pwCb);
+		ScanResult target = ReportExporter.loadScanFile(targetFile, pwCb);
 
 		DeltaScanResult result = DeltaScanner.compare(
 				base, target, baseFile, targetFile);
@@ -959,6 +959,33 @@ public class StartCMD {
 		};
 		new Timer(delay, taskPerformer).start();
 
+	}
+
+	/**
+	 * Build a PasswordCallback from --password-env or --password-file CLI flags.
+	 * Returns null if neither flag is specified.
+	 */
+	private com.mps.deepviolet.persist.ScanFileIO.PasswordCallback buildPasswordCallback(
+			CommandLine cmdline) {
+		if (cmdline.hasOption("password-env")) {
+			String envVar = cmdline.getOptionValue("password-env");
+			return () -> {
+				String pw = System.getenv(envVar);
+				if (pw == null) {
+					throw new IOException("Environment variable not set: " + envVar);
+				}
+				return pw.toCharArray();
+			};
+		}
+		if (cmdline.hasOption("password-file")) {
+			String filePath = cmdline.getOptionValue("password-file");
+			return () -> {
+				String pw = java.nio.file.Files.readString(
+						java.nio.file.Path.of(filePath)).trim();
+				return pw.toCharArray();
+			};
+		}
+		return null;
 	}
 
 }

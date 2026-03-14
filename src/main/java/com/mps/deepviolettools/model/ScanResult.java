@@ -129,34 +129,68 @@ public class ScanResult {
         public boolean isSuccess() {
             return errorMessage == null;
         }
-    }
 
-    /**
-     * Tracks the origin of a file in the provenance chain:
-     * Target File &rarr; Scan File &rarr; Report.
-     */
-    public static class SourceProvenance {
-        private final String fileName;
-        private final String filePath;
-        private final String sha256;
-
-        public SourceProvenance(String fileName, String filePath, String sha256) {
-            this.fileName = fileName;
-            this.filePath = filePath;
-            this.sha256 = sha256;
+        public com.mps.deepviolet.persist.HostSnapshot toHostSnapshot() {
+            com.mps.deepviolet.persist.HostSnapshot hs = new com.mps.deepviolet.persist.HostSnapshot(targetUrl);
+            hs.setRiskScore(riskScore);
+            hs.setCiphers(ciphers);
+            hs.setSecurityHeaders(securityHeaders);
+            hs.setConnProperties(connProperties);
+            hs.setHttpHeaders(httpHeaders);
+            hs.setTlsFingerprint(tlsFingerprint);
+            if (scanTree != null) {
+                hs.setReportTree(com.mps.deepviolettools.util.ReportExporter.toJsonMap(scanTree));
+            }
+            hs.setErrorMessage(errorMessage);
+            hs.setRuleContextMap(ruleContextMap);
+            return hs;
         }
 
-        public String getFileName() { return fileName; }
-        public String getFilePath() { return filePath; }
-        public String getSha256() { return sha256; }
+        public static HostResult fromHostSnapshot(com.mps.deepviolet.persist.HostSnapshot hs) {
+            HostResult hr = new HostResult(hs.getTargetUrl());
+            hr.setRiskScore(hs.getRiskScore());
+            hr.setCiphers(hs.getCiphers());
+            hr.setSecurityHeaders(hs.getSecurityHeaders());
+            hr.setConnProperties(hs.getConnProperties());
+            hr.setHttpHeaders(hs.getHttpHeaders());
+            hr.setTlsFingerprint(hs.getTlsFingerprint());
+            if (hs.getReportTree() != null) {
+                hr.setScanTree(com.mps.deepviolettools.util.ReportExporter.fromJsonMap(hs.getReportTree()));
+            }
+            hr.setErrorMessage(hs.getErrorMessage());
+            hr.setRuleContextMap(hs.getRuleContextMap());
+            return hr;
+        }
     }
 
     private final List<HostResult> results = new ArrayList<>();
     private int totalTargets;
     private int successCount;
     private int errorCount;
-    private SourceProvenance targetSource;
-    private transient SourceProvenance scanSource;
+    private String scanId;
+
+    public com.mps.deepviolet.persist.ScanSnapshot toSnapshot() {
+        com.mps.deepviolet.persist.ScanSnapshot snapshot = new com.mps.deepviolet.persist.ScanSnapshot();
+        snapshot.setTotalTargets(totalTargets);
+        snapshot.setSuccessCount(successCount);
+        snapshot.setErrorCount(errorCount);
+        for (HostResult hr : results) {
+            snapshot.addHost(hr.toHostSnapshot());
+        }
+        return snapshot;
+    }
+
+    public static ScanResult fromSnapshot(com.mps.deepviolet.persist.ScanSnapshot snapshot) {
+        ScanResult result = new ScanResult();
+        result.setTotalTargets(snapshot.getTotalTargets());
+        result.setSuccessCount(snapshot.getSuccessCount());
+        result.setErrorCount(snapshot.getErrorCount());
+        result.setScanId(snapshot.getScanId());
+        for (com.mps.deepviolet.persist.HostSnapshot hs : snapshot.getHosts()) {
+            result.addResult(HostResult.fromHostSnapshot(hs));
+        }
+        return result;
+    }
 
     public synchronized void addResult(HostResult result) {
         results.add(result);
@@ -190,20 +224,12 @@ public class ScanResult {
         this.errorCount = errorCount;
     }
 
-    public SourceProvenance getTargetSource() {
-        return targetSource;
+    public String getScanId() {
+        return scanId;
     }
 
-    public void setTargetSource(SourceProvenance targetSource) {
-        this.targetSource = targetSource;
-    }
-
-    public SourceProvenance getScanSource() {
-        return scanSource;
-    }
-
-    public void setScanSource(SourceProvenance scanSource) {
-        this.scanSource = scanSource;
+    public void setScanId(String scanId) {
+        this.scanId = scanId;
     }
 
     // ---- Error column helper ----

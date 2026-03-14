@@ -39,8 +39,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>21</java.version>
 
-        <!-- DeepViolet API (JitPack: modernize-api branch commit) -->
-        <deepviolet.version>a349e32d5a</deepviolet.version>
+        <!-- DeepViolet API (JitPack: feature/ai-analysis-scan-persistence branch commit) -->
+        <deepviolet.version>12ce2dc29c</deepviolet.version>
 
         <!-- Dependencies - aligned with DeepViolet API -->
         <logback.version>1.5.6</logback.version>
