@@ -342,17 +342,18 @@ public class DeltaResultsPanel extends JPanel {
             appendStyled("\n", font, contentColor, false);
             appendStyled("[" + hd.getNormalizedUrl() + "]\n", font, headingColor, true);
 
+            String host = hd.getNormalizedUrl();
             renderRiskDeductions(hd, font, subsectionColor, contentColor,
                     wrap, wrapWidth);
-            renderCipherDelta(hd.getCipherDelta(), font, subsectionColor,
+            renderCipherDelta(hd.getCipherDelta(), host, font, subsectionColor,
                     contentColor, wrap, wrapWidth);
             renderMapDelta(hd.getSecurityHeadersDelta(), "Security Headers",
-                    font, subsectionColor, contentColor, wrap, wrapWidth);
+                    host, font, subsectionColor, contentColor, wrap, wrapWidth);
             renderMapDelta(hd.getConnectionDelta(), "Connection",
-                    font, subsectionColor, contentColor, wrap, wrapWidth);
+                    host, font, subsectionColor, contentColor, wrap, wrapWidth);
             renderMapDelta(hd.getHttpHeadersDelta(), "HTTP Headers",
-                    font, subsectionColor, contentColor, wrap, wrapWidth);
-            renderFingerprintDelta(hd.getFingerprintDelta(), font,
+                    host, font, subsectionColor, contentColor, wrap, wrapWidth);
+            renderFingerprintDelta(hd.getFingerprintDelta(), host, font,
                     subsectionColor, contentColor, wrap, wrapWidth);
         }
 
@@ -386,8 +387,9 @@ public class DeltaResultsPanel extends JPanel {
         RiskDelta rd = hd.getRiskDelta();
         if (rd == null || !rd.hasChanges()) return;
 
+        String host = hd.getNormalizedUrl();
         if (!rd.getAddedDeductions().isEmpty()) {
-            appendStyled("   Added deductions:\n", font, subsectionColor, true);
+            appendStyled("   Added deductions (" + host + "):\n", font, subsectionColor, true);
             for (RiskDelta.DeductionInfo di : rd.getAddedDeductions()) {
                 Color sevColor = prefs.getColorForSeverity(di.getSeverity());
                 String line = "      " + di.getRuleId() + " [" + di.getSeverity()
@@ -398,7 +400,7 @@ public class DeltaResultsPanel extends JPanel {
             }
         }
         if (!rd.getRemovedDeductions().isEmpty()) {
-            appendStyled("   Removed deductions:\n", font, subsectionColor, true);
+            appendStyled("   Removed deductions (" + host + "):\n", font, subsectionColor, true);
             for (RiskDelta.DeductionInfo di : rd.getRemovedDeductions()) {
                 Color sevColor = prefs.getColorForSeverity(di.getSeverity());
                 String line = "      " + di.getRuleId() + " [" + di.getSeverity()
@@ -410,12 +412,12 @@ public class DeltaResultsPanel extends JPanel {
         }
     }
 
-    private void renderCipherDelta(CipherDelta cd, Font font,
+    private void renderCipherDelta(CipherDelta cd, String host, Font font,
                                     Color subsectionColor, Color contentColor,
                                     boolean wrap, int wrapWidth) {
         if (cd == null || !cd.hasChanges()) return;
 
-        appendStyled("   Cipher suite changes:\n", font, subsectionColor, true);
+        appendStyled("   Cipher suite changes (" + host + "):\n", font, subsectionColor, true);
         for (CipherDelta.CipherInfo ci : cd.getAddedCiphers()) {
             String line = "      + " + ci.getName()
                     + " (" + ci.getStrength() + ", " + ci.getProtocol() + ")";
@@ -430,12 +432,12 @@ public class DeltaResultsPanel extends JPanel {
         }
     }
 
-    private void renderMapDelta(MapDelta md, String title, Font font,
-                                 Color subsectionColor, Color contentColor,
+    private void renderMapDelta(MapDelta md, String title, String host,
+                                 Font font, Color subsectionColor, Color contentColor,
                                  boolean wrap, int wrapWidth) {
         if (md == null || !md.hasChanges()) return;
 
-        appendStyled("   " + title + " changes:\n", font, subsectionColor, true);
+        appendStyled("   " + title + " changes (" + host + "):\n", font, subsectionColor, true);
         for (Map.Entry<String, String> e : md.getAddedEntries().entrySet()) {
             String line = "      + " + e.getKey() + ": " + e.getValue();
             appendWrappedLine(line, "         ", wrap, wrapWidth,
@@ -454,12 +456,12 @@ public class DeltaResultsPanel extends JPanel {
         }
     }
 
-    private void renderFingerprintDelta(FingerprintDelta fd, Font font,
-                                         Color subsectionColor, Color contentColor,
+    private void renderFingerprintDelta(FingerprintDelta fd, String host,
+                                         Font font, Color subsectionColor, Color contentColor,
                                          boolean wrap, int wrapWidth) {
         if (fd == null || !fd.hasChanges()) return;
 
-        appendStyled("   Fingerprint changes:\n", font, subsectionColor, true);
+        appendStyled("   Probe Fingerprint changes (" + host + "):\n", font, subsectionColor, true);
         if (fd.getBaseHash() != null && fd.getTargetHash() != null) {
             appendWrappedLine("      Hash: " + fd.getBaseHash()
                     + " \u2192 " + fd.getTargetHash(), "         ",
