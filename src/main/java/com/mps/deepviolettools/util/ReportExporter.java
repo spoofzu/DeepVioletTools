@@ -2409,15 +2409,16 @@ public class ReportExporter {
 			if (!changed.isEmpty()) {
 				sb.append("[Changed Hosts]\n\n");
 				for (HostDelta hd : changed) {
-					sb.append("   --- ").append(hd.getNormalizedUrl())
+					String host = hd.getNormalizedUrl();
+					sb.append("   --- ").append(host)
 					  .append(" (").append(hd.getOverallDirection().name())
 					  .append(") ---\n\n");
-					appendRiskDeltaText(sb, hd.getRiskDelta());
-					appendCipherDeltaText(sb, hd.getCipherDelta());
-					appendMapDeltaText(sb, hd.getSecurityHeadersDelta());
-					appendMapDeltaText(sb, hd.getConnectionDelta());
-					appendMapDeltaText(sb, hd.getHttpHeadersDelta());
-					appendFingerprintDeltaText(sb, hd.getFingerprintDelta());
+					appendRiskDeltaText(sb, hd.getRiskDelta(), host);
+					appendCipherDeltaText(sb, hd.getCipherDelta(), host);
+					appendMapDeltaText(sb, hd.getSecurityHeadersDelta(), host);
+					appendMapDeltaText(sb, hd.getConnectionDelta(), host);
+					appendMapDeltaText(sb, hd.getHttpHeadersDelta(), host);
+					appendFingerprintDeltaText(sb, hd.getFingerprintDelta(), host);
 				}
 			}
 		}
@@ -2486,8 +2487,9 @@ public class ReportExporter {
 		return String.format("%.2f", score);
 	}
 
-	private static void appendRiskDeltaText(StringBuilder sb, RiskDelta delta) {
-		sb.append("   [TLS Risk Assessment]\n");
+	private static void appendRiskDeltaText(StringBuilder sb, RiskDelta delta,
+			String host) {
+		sb.append("   [TLS Risk Assessment (").append(host).append(")]\n");
 		if (delta == null || !delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
@@ -2515,8 +2517,9 @@ public class ReportExporter {
 		sb.append('\n');
 	}
 
-	private static void appendCipherDeltaText(StringBuilder sb, CipherDelta delta) {
-		sb.append("   [Server cipher suites]\n");
+	private static void appendCipherDeltaText(StringBuilder sb, CipherDelta delta,
+			String host) {
+		sb.append("   [Server cipher suites (").append(host).append(")]\n");
 		if (delta == null || !delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
@@ -2534,9 +2537,10 @@ public class ReportExporter {
 		sb.append('\n');
 	}
 
-	private static void appendMapDeltaText(StringBuilder sb, MapDelta delta) {
+	private static void appendMapDeltaText(StringBuilder sb, MapDelta delta,
+			String host) {
 		if (delta == null) return;
-		sb.append("   [").append(delta.getSectionName()).append("]\n");
+		sb.append("   [").append(delta.getSectionName()).append(" (").append(host).append(")]\n");
 		if (!delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
@@ -2558,8 +2562,8 @@ public class ReportExporter {
 	}
 
 	private static void appendFingerprintDeltaText(StringBuilder sb,
-			FingerprintDelta delta) {
-		sb.append("   [TLS server fingerprint]\n");
+			FingerprintDelta delta, String host) {
+		sb.append("   [TLS Probe Fingerprint (").append(host).append(")]\n");
 		if (delta == null || !delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
@@ -2839,16 +2843,18 @@ public class ReportExporter {
 	}
 
 	private static void writeHtmlDeltaSections(PrintWriter p, HostDelta hd) {
-		writeHtmlRiskDelta(p, hd.getRiskDelta());
-		writeHtmlCipherDelta(p, hd.getCipherDelta());
-		writeHtmlMapDelta(p, hd.getSecurityHeadersDelta());
-		writeHtmlMapDelta(p, hd.getConnectionDelta());
-		writeHtmlMapDelta(p, hd.getHttpHeadersDelta());
-		writeHtmlFingerprintDelta(p, hd.getFingerprintDelta());
+		String host = hd.getNormalizedUrl();
+		writeHtmlRiskDelta(p, hd.getRiskDelta(), host);
+		writeHtmlCipherDelta(p, hd.getCipherDelta(), host);
+		writeHtmlMapDelta(p, hd.getSecurityHeadersDelta(), host);
+		writeHtmlMapDelta(p, hd.getConnectionDelta(), host);
+		writeHtmlMapDelta(p, hd.getHttpHeadersDelta(), host);
+		writeHtmlFingerprintDelta(p, hd.getFingerprintDelta(), host);
 	}
 
-	private static void writeHtmlRiskDelta(PrintWriter p, RiskDelta delta) {
-		p.println("   <span class=\"section\">[TLS Risk Assessment]</span>");
+	private static void writeHtmlRiskDelta(PrintWriter p, RiskDelta delta,
+			String host) {
+		p.println("   <span class=\"section\">[TLS Risk Assessment (" + escapeHtml(host) + ")]</span>");
 		if (delta == null || !delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
@@ -2870,8 +2876,9 @@ public class ReportExporter {
 		p.println();
 	}
 
-	private static void writeHtmlCipherDelta(PrintWriter p, CipherDelta delta) {
-		p.println("   <span class=\"section\">[Server cipher suites]</span>");
+	private static void writeHtmlCipherDelta(PrintWriter p, CipherDelta delta,
+			String host) {
+		p.println("   <span class=\"section\">[Server cipher suites (" + escapeHtml(host) + ")]</span>");
 		if (delta == null || !delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
@@ -2886,9 +2893,10 @@ public class ReportExporter {
 		p.println();
 	}
 
-	private static void writeHtmlMapDelta(PrintWriter p, MapDelta delta) {
+	private static void writeHtmlMapDelta(PrintWriter p, MapDelta delta,
+			String host) {
 		if (delta == null) return;
-		p.println("   <span class=\"section\">[" + escapeHtml(delta.getSectionName()) + "]</span>");
+		p.println("   <span class=\"section\">[" + escapeHtml(delta.getSectionName()) + " (" + escapeHtml(host) + ")]</span>");
 		if (!delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
@@ -2907,8 +2915,8 @@ public class ReportExporter {
 	}
 
 	private static void writeHtmlFingerprintDelta(PrintWriter p,
-			FingerprintDelta delta) {
-		p.println("   <span class=\"section\">[TLS server fingerprint]</span>");
+			FingerprintDelta delta, String host) {
+		p.println("   <span class=\"section\">[TLS Probe Fingerprint (" + escapeHtml(host) + ")]</span>");
 		if (delta == null || !delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
@@ -2978,13 +2986,14 @@ public class ReportExporter {
 							10f, 12f, Color.BLACK, true);
 
 					// Flatten delta text for this host
+					String host = hd.getNormalizedUrl();
 					StringBuilder hostText = new StringBuilder();
-					appendRiskDeltaText(hostText, hd.getRiskDelta());
-					appendCipherDeltaText(hostText, hd.getCipherDelta());
-					appendMapDeltaText(hostText, hd.getSecurityHeadersDelta());
-					appendMapDeltaText(hostText, hd.getConnectionDelta());
-					appendMapDeltaText(hostText, hd.getHttpHeadersDelta());
-					appendFingerprintDeltaText(hostText, hd.getFingerprintDelta());
+					appendRiskDeltaText(hostText, hd.getRiskDelta(), host);
+					appendCipherDeltaText(hostText, hd.getCipherDelta(), host);
+					appendMapDeltaText(hostText, hd.getSecurityHeadersDelta(), host);
+					appendMapDeltaText(hostText, hd.getConnectionDelta(), host);
+					appendMapDeltaText(hostText, hd.getHttpHeadersDelta(), host);
+					appendFingerprintDeltaText(hostText, hd.getFingerprintDelta(), host);
 
 					for (String line : hostText.toString().split("\n")) {
 						Color lineColor = Color.DARK_GRAY;
