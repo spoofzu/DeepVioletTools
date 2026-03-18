@@ -44,6 +44,7 @@ public class ScanNode {
 	private final String value;
 	private final NodeType type;
 	private final String severity;
+	private boolean meta;
 	private ScanNode parent;
 	private final List<ScanNode> children = new CopyOnWriteArrayList<>();
 
@@ -184,6 +185,37 @@ public class ScanNode {
 	/** @return the risk severity level (null for non-risk warnings) */
 	public String getSeverity() {
 		return severity;
+	}
+
+	/**
+	 * @return true if this node (or an ancestor) is metadata.
+	 *         Metadata nodes are only displayed when the "Include
+	 *         section metadata" setting is enabled.
+	 */
+	public boolean isMeta() {
+		return meta;
+	}
+
+	/**
+	 * Mark this node as metadata. When a node is marked as meta, all
+	 * of its descendants are implicitly meta as well.
+	 *
+	 * @param meta true to mark as metadata
+	 * @return this node (for chaining)
+	 */
+	public ScanNode setMeta(boolean meta) {
+		this.meta = meta;
+		return this;
+	}
+
+	/**
+	 * @return true if this node or any of its ancestors is marked as
+	 *         metadata, meaning it should be hidden when metadata
+	 *         display is disabled.
+	 */
+	public boolean isEffectivelyMeta() {
+		if (meta) return true;
+		return parent != null && parent.isEffectivelyMeta();
 	}
 
 	/** @return the parent node (null for root) */

@@ -101,6 +101,7 @@ public class FontChooserDialog extends JDialog {
 	private JCheckBox chkCertChain;
 	private JCheckBox chkRevocation;
 	private JCheckBox chkTlsFingerprint;
+	private JCheckBox chkIncludeMetadata;
 	private JComboBox<String> cmbCipherConvention;
 	private JCheckBox chkSslv3;
 	private JCheckBox chkTls10;
@@ -113,6 +114,11 @@ public class FontChooserDialog extends JDialog {
 	// Scanning priority controls (unified)
 	private JSpinner spnWorkerThreads;
 	private JSpinner spnThrottleDelayMs;
+	private JSpinner spnMaxRetries;
+	private JSpinner spnInitialRetryDelayMs;
+	private JSpinner spnMaxRetryDelayMs;
+	private JSpinner spnRetryBudgetMs;
+	private JSpinner spnRestorePointInterval;
 
 	// AI Chat config controls
 	private JCheckBox chkAiChatEnabled;
@@ -165,6 +171,11 @@ public class FontChooserDialog extends JDialog {
 	private JCheckBox chkUserRiskRulesEnabled;
 	private JTextArea txtUserRiskRulesYaml;
 	private boolean userRiskRulesPlaceholderActive;
+
+	// System Risks tab controls
+	private JCheckBox chkSystemRiskRulesEnabled;
+	private JTextArea txtSystemRiskRulesYaml;
+	private boolean systemRiskRulesPlaceholderActive;
 
 	// Card display controls
 	private JComboBox<String> cmbCardFontFamily;
@@ -656,12 +667,16 @@ public class FontChooserDialog extends JDialog {
 		// ---- User Risks tab content ----
 		JPanel pnlUserRisks = buildUserRisksTab();
 
+		// ---- System Risks tab content ----
+		JPanel pnlSystemRisks = buildSystemRisksTab();
+
 		// ---- tabbed pane ----
 		settingsTabbedPane = new JTabbedPane();
 		settingsTabbedPane.addTab("Reporting", pnlReporting);
 		settingsTabbedPane.addTab("Engine", pnlEngine);
 		settingsTabbedPane.addTab("AI", pnlAi);
 		settingsTabbedPane.addTab("Cipher Map", pnlCipherMap);
+		settingsTabbedPane.addTab("System Risks", pnlSystemRisks);
 		settingsTabbedPane.addTab("User Risks", pnlUserRisks);
 		settingsTabbedPane.addTab("Application", pnlApplication);
 
@@ -805,6 +820,15 @@ public class FontChooserDialog extends JDialog {
 				}
 				chkCipherMapEnabled.setSelected(true);
 				syncPrefsFromControls();
+			} else if ("System Risks".equals(tabTitle)) {
+				String apiDefault = FontPreferences.loadApiDefaultRiskRulesYaml();
+				if (apiDefault != null) {
+					txtSystemRiskRulesYaml.setText(apiDefault);
+					txtSystemRiskRulesYaml.setForeground(javax.swing.UIManager.getColor("TextArea.foreground"));
+					systemRiskRulesPlaceholderActive = false;
+				}
+				chkSystemRiskRulesEnabled.setSelected(false);
+				syncPrefsFromControls();
 			} else if ("User Risks".equals(tabTitle)) {
 				chkUserRiskRulesEnabled.setSelected(true);
 				txtUserRiskRulesYaml.setText(FontPreferences.DEFAULT_USER_RISK_RULES);
@@ -837,6 +861,12 @@ public class FontChooserDialog extends JDialog {
 				FontPreferences.saveUserRiskRulesYaml(txtUserRiskRulesYaml.getText());
 			} else if (!prefs.isUserRiskRulesEnabled()) {
 				FontPreferences.deleteUserRiskRulesYaml();
+			}
+			// Save system risk rules overlay YAML to disk
+			if (!systemRiskRulesPlaceholderActive && !txtSystemRiskRulesYaml.getText().isBlank()) {
+				FontPreferences.saveSystemRiskRulesYaml(txtSystemRiskRulesYaml.getText());
+			} else if (!prefs.isSystemRiskRulesEnabled()) {
+				FontPreferences.deleteSystemRiskRulesYaml();
 			}
 			dispose();
 		});
@@ -872,10 +902,10 @@ public class FontChooserDialog extends JDialog {
 			}
 		}
 
-		// Remove "Cipher Map" and "User Risks" tabs from settings
+		// Remove "Cipher Map", "System Risks", and "User Risks" tabs from settings
 		for (int i = settingsTabbedPane.getTabCount() - 1; i >= 0; i--) {
 			String title = settingsTabbedPane.getTitleAt(i);
-			if ("Cipher Map".equals(title) || "User Risks".equals(title)) {
+			if ("Cipher Map".equals(title) || "System Risks".equals(title) || "User Risks".equals(title)) {
 				settingsTabbedPane.removeTabAt(i);
 			}
 		}
@@ -894,16 +924,25 @@ public class FontChooserDialog extends JDialog {
 	}
 
 	/**
-	 * Build the unified engine settings panel with report sections,
-	 * scanning priority, cipher convention, and protocol versions.
+	 * Build the unified engine settings panel with two columns:
+	 * Column 1: Report Sections, Cipher Suite Naming, Protocol Versions
+	 * Column 2: Scan Workload, Scan Retry, Scan Recovery
 	 */
 	private JPanel buildEnginePanel() {
 		JPanel panel = new JPanel(new GridBagLayout());
-		GridBagConstraints ec = new GridBagConstraints();
-		ec.fill = GridBagConstraints.HORIZONTAL;
-		ec.weightx = 1.0;
-		ec.gridx = 0;
-		ec.insets = new Insets(4, 6, 4, 6);
+		GridBagConstraints tc = new GridBagConstraints();
+		tc.fill = GridBagConstraints.BOTH;
+		tc.anchor = GridBagConstraints.NORTH;
+		tc.weighty = 1.0;
+		tc.insets = new Insets(0, 2, 0, 2);
+
+		// ======== Column 1 ========
+		JPanel col1 = new JPanel(new GridBagLayout());
+		GridBagConstraints c1 = new GridBagConstraints();
+		c1.fill = GridBagConstraints.HORIZONTAL;
+		c1.weightx = 1.0;
+		c1.gridx = 0;
+		c1.insets = new Insets(4, 4, 4, 4);
 
 		// ---- Report Sections panel (two-column layout) ----
 		pnlReportSections = new JPanel(new GridBagLayout());
@@ -970,16 +1009,22 @@ public class FontChooserDialog extends JDialog {
 		rc.gridx = 1; rc.gridy = 3;
 		pnlReportSections.add(chkRevocation, rc);
 
-		chkTlsFingerprint = new JCheckBox("TLS server fingerprint");
+		chkTlsFingerprint = new JCheckBox("TLS Probe Fingerprint");
 		chkTlsFingerprint.setSelected(prefs.isSectionTlsFingerprint());
 		rc.gridx = 1; rc.gridy = 4;
 		pnlReportSections.add(chkTlsFingerprint, rc);
-		// Spacer absorbs extra width
-		rc.gridx = 2; rc.gridy = 0; rc.weightx = 1.0;
-		rc.fill = GridBagConstraints.HORIZONTAL;
-		rc.insets = new Insets(2, 6, 2, 6);
-		pnlReportSections.add(new JPanel(), rc);
-		rc.weightx = 0; rc.fill = GridBagConstraints.NONE;
+
+		// Include metadata checkbox (only visible in workbench mode)
+		chkIncludeMetadata = new JCheckBox("Include section metadata");
+		chkIncludeMetadata.setSelected(prefs.isSectionIncludeMetadata());
+		chkIncludeMetadata.setToolTipText("Show detailed metadata within report sections (e.g. fingerprint probe aggregation)");
+		if (!prefs.isWorkbenchMode()) {
+			chkIncludeMetadata.setVisible(false);
+		}
+		rc.gridx = 0; rc.gridy = 6; rc.gridwidth = 2;
+		rc.insets = new Insets(6, 6, 2, 6);
+		pnlReportSections.add(chkIncludeMetadata, rc);
+		rc.gridwidth = 1;
 
 		// Select All / Deselect All buttons spanning both columns
 		JPanel pnlSelectBtns = new JPanel();
@@ -1007,8 +1052,8 @@ public class FontChooserDialog extends JDialog {
 			for (JCheckBox cb : sectionBoxes) cb.setSelected(false);
 		});
 
-		ec.gridy = 0;
-		panel.add(pnlReportSections, ec);
+		c1.gridy = 0;
+		col1.add(pnlReportSections, c1);
 
 		// ---- Cipher Suite Naming panel ----
 		JPanel pnlCipher = new JPanel(new GridBagLayout());
@@ -1034,8 +1079,8 @@ public class FontChooserDialog extends JDialog {
 		cpc.fill = GridBagConstraints.HORIZONTAL;
 		pnlCipher.add(new JPanel(), cpc);
 
-		ec.gridy = 1;
-		panel.add(pnlCipher, ec);
+		c1.gridy = 1;
+		col1.add(pnlCipher, c1);
 
 		// ---- Protocol Versions panel (two-column layout) ----
 		JPanel pnlProtocol = new JPanel(new GridBagLayout());
@@ -1072,50 +1117,142 @@ public class FontChooserDialog extends JDialog {
 		chkTls13.setSelected(prefs.isProtocolTls13());
 		pc.gridx = 1; pc.gridy = 1;
 		pnlProtocol.add(chkTls13, pc);
-		// Spacer absorbs extra width
-		pc.gridx = 2; pc.gridy = 0; pc.weightx = 1.0;
-		pc.fill = GridBagConstraints.HORIZONTAL;
-		pc.insets = new Insets(2, 6, 2, 6);
-		pnlProtocol.add(new JPanel(), pc);
 
-		ec.gridy = 2;
-		panel.add(pnlProtocol, ec);
+		c1.gridy = 2;
+		col1.add(pnlProtocol, c1);
 
-		// ---- Scanning Priority panel ----
-		JPanel pnlPriority = new JPanel(new GridBagLayout());
-		pnlPriority.setBorder(BorderFactory.createTitledBorder("Scanning Priority"));
-		GridBagConstraints pc2 = new GridBagConstraints();
-		pc2.insets = new Insets(4, 6, 4, 6);
-		pc2.anchor = GridBagConstraints.WEST;
+		// Column 1 vertical spacer
+		c1.gridy = 3;
+		c1.weighty = 1.0;
+		c1.fill = GridBagConstraints.BOTH;
+		col1.add(new JPanel(), c1);
 
-		pc2.gridx = 0; pc2.gridy = 0;
-		pnlPriority.add(new JLabel("Worker Threads:"), pc2);
+		// ======== Column 2 ========
+		JPanel col2 = new JPanel(new GridBagLayout());
+		GridBagConstraints c2 = new GridBagConstraints();
+		c2.fill = GridBagConstraints.HORIZONTAL;
+		c2.weightx = 1.0;
+		c2.gridx = 0;
+		c2.insets = new Insets(4, 4, 4, 4);
+
+		// ---- Scan Workload panel ----
+		JPanel pnlWorkload = new JPanel(new GridBagLayout());
+		pnlWorkload.setBorder(BorderFactory.createTitledBorder("Scan Workload"));
+		GridBagConstraints wc = new GridBagConstraints();
+		wc.insets = new Insets(4, 6, 4, 6);
+		wc.anchor = GridBagConstraints.WEST;
+
+		wc.gridx = 0; wc.gridy = 0;
+		pnlWorkload.add(new JLabel("Worker Threads:"), wc);
 		spnWorkerThreads = new JSpinner(new SpinnerNumberModel(
 				prefs.getWorkerThreads(), 1, 10, 1));
-		pc2.gridx = 1;
-		pnlPriority.add(spnWorkerThreads, pc2);
+		wc.gridx = 1;
+		pnlWorkload.add(spnWorkerThreads, wc);
 
-		pc2.gridx = 0; pc2.gridy = 1;
-		pnlPriority.add(new JLabel("Throttle Delay:"), pc2);
+		wc.gridx = 0; wc.gridy = 1;
+		pnlWorkload.add(new JLabel("Throttle Delay:"), wc);
 		spnThrottleDelayMs = new JSpinner(new SpinnerNumberModel(
 				(int) prefs.getThrottleDelayMs(), 0, 10000, 100));
-		pc2.gridx = 1;
-		pnlPriority.add(spnThrottleDelayMs, pc2);
-		pc2.gridx = 2;
-		pnlPriority.add(new JLabel("ms"), pc2);
+		wc.gridx = 1;
+		pnlWorkload.add(spnThrottleDelayMs, wc);
+		wc.gridx = 2;
+		pnlWorkload.add(new JLabel("ms"), wc);
+
+		wc.gridx = 0; wc.gridy = 2;
+		pnlWorkload.add(new JLabel("Max Retries:"), wc);
+		spnMaxRetries = new JSpinner(new SpinnerNumberModel(
+				prefs.getMaxRetries(), 0, 10, 1));
+		wc.gridx = 1;
+		pnlWorkload.add(spnMaxRetries, wc);
+
 		// Spacer absorbs extra width
-		pc2.gridx = 3; pc2.gridy = 0; pc2.weightx = 1.0;
-		pc2.fill = GridBagConstraints.HORIZONTAL;
-		pnlPriority.add(new JPanel(), pc2);
+		wc.gridx = 3; wc.gridy = 0; wc.weightx = 1.0;
+		wc.fill = GridBagConstraints.HORIZONTAL;
+		pnlWorkload.add(new JPanel(), wc);
 
-		ec.gridy = 3;
-		panel.add(pnlPriority, ec);
+		c2.gridy = 0;
+		col2.add(pnlWorkload, c2);
 
-		// Spacer to push content to top
-		ec.gridy = 4;
-		ec.weighty = 1.0;
-		ec.fill = GridBagConstraints.BOTH;
-		panel.add(new JPanel(), ec);
+		// ---- Scan Retry panel ----
+		JPanel pnlRetry = new JPanel(new GridBagLayout());
+		pnlRetry.setBorder(BorderFactory.createTitledBorder("Scan Retry"));
+		GridBagConstraints ry = new GridBagConstraints();
+		ry.insets = new Insets(4, 6, 4, 6);
+		ry.anchor = GridBagConstraints.WEST;
+
+		ry.gridx = 0; ry.gridy = 0;
+		pnlRetry.add(new JLabel("Initial Retry Delay:"), ry);
+		spnInitialRetryDelayMs = new JSpinner(new SpinnerNumberModel(
+				(int) prefs.getInitialRetryDelayMs(), 100, 10000, 100));
+		ry.gridx = 1;
+		pnlRetry.add(spnInitialRetryDelayMs, ry);
+		ry.gridx = 2;
+		pnlRetry.add(new JLabel("ms"), ry);
+
+		ry.gridx = 0; ry.gridy = 1;
+		pnlRetry.add(new JLabel("Max Retry Delay:"), ry);
+		spnMaxRetryDelayMs = new JSpinner(new SpinnerNumberModel(
+				(int) prefs.getMaxRetryDelayMs(), 100, 30000, 500));
+		ry.gridx = 1;
+		pnlRetry.add(spnMaxRetryDelayMs, ry);
+		ry.gridx = 2;
+		pnlRetry.add(new JLabel("ms"), ry);
+
+		ry.gridx = 0; ry.gridy = 2;
+		pnlRetry.add(new JLabel("Retry Budget:"), ry);
+		spnRetryBudgetMs = new JSpinner(new SpinnerNumberModel(
+				(int) prefs.getRetryBudgetMs(), 1000, 120000, 1000));
+		ry.gridx = 1;
+		pnlRetry.add(spnRetryBudgetMs, ry);
+		ry.gridx = 2;
+		pnlRetry.add(new JLabel("ms"), ry);
+
+		// Spacer absorbs extra width
+		ry.gridx = 3; ry.gridy = 0; ry.weightx = 1.0;
+		ry.fill = GridBagConstraints.HORIZONTAL;
+		pnlRetry.add(new JPanel(), ry);
+
+		c2.gridy = 1;
+		col2.add(pnlRetry, c2);
+
+		// ---- Scan Recovery panel ----
+		JPanel pnlRecovery = new JPanel(new GridBagLayout());
+		pnlRecovery.setBorder(BorderFactory.createTitledBorder("Scan Recovery"));
+		GridBagConstraints rv = new GridBagConstraints();
+		rv.insets = new Insets(4, 6, 4, 6);
+		rv.anchor = GridBagConstraints.WEST;
+
+		rv.gridx = 0; rv.gridy = 0;
+		pnlRecovery.add(new JLabel("Restore Point:"), rv);
+		spnRestorePointInterval = new JSpinner(new SpinnerNumberModel(
+				prefs.getRestorePointInterval(), 5, 1000, 5));
+		rv.gridx = 1;
+		pnlRecovery.add(spnRestorePointInterval, rv);
+		rv.gridx = 2;
+		pnlRecovery.add(new JLabel("hosts"), rv);
+
+		// Spacer absorbs extra width
+		rv.gridx = 3; rv.gridy = 0; rv.weightx = 1.0;
+		rv.fill = GridBagConstraints.HORIZONTAL;
+		pnlRecovery.add(new JPanel(), rv);
+
+		c2.gridy = 2;
+		col2.add(pnlRecovery, c2);
+
+		// Column 2 vertical spacer
+		c2.gridy = 3;
+		c2.weighty = 1.0;
+		c2.fill = GridBagConstraints.BOTH;
+		col2.add(new JPanel(), c2);
+
+		// ======== Add columns to main panel ========
+		tc.gridx = 0; tc.gridy = 0;
+		tc.weightx = 0.5;
+		panel.add(col1, tc);
+
+		tc.gridx = 1;
+		tc.weightx = 0.5;
+		panel.add(col2, tc);
 
 		return panel;
 	}
@@ -1918,6 +2055,117 @@ public class FontChooserDialog extends JDialog {
 		cipherMapPlaceholderActive = true;
 	}
 
+	private JPanel buildSystemRisksTab() {
+		JPanel panel = new JPanel(new BorderLayout(6, 6));
+		panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+		// Enable checkbox
+		chkSystemRiskRulesEnabled = new JCheckBox("Enable system risk rules overlay (replaces built-in)");
+		chkSystemRiskRulesEnabled.setSelected(prefs.isSystemRiskRulesEnabled());
+		panel.add(chkSystemRiskRulesEnabled, BorderLayout.NORTH);
+
+		// YAML text area
+		txtSystemRiskRulesYaml = new JTextArea();
+		txtSystemRiskRulesYaml.setFont(prefs.getAppFont());
+		txtSystemRiskRulesYaml.setTabSize(2);
+
+		// Load saved content, fall back to API default
+		String saved = FontPreferences.loadSystemRiskRulesYaml();
+		if (saved != null && !saved.isBlank()) {
+			txtSystemRiskRulesYaml.setText(saved);
+			systemRiskRulesPlaceholderActive = false;
+		} else {
+			String apiDefault = FontPreferences.loadApiDefaultRiskRulesYaml();
+			if (apiDefault != null) {
+				txtSystemRiskRulesYaml.setText(apiDefault);
+				systemRiskRulesPlaceholderActive = false;
+			} else {
+				setSystemRiskRulesPlaceholder();
+			}
+		}
+
+		// Placeholder focus listeners
+		txtSystemRiskRulesYaml.addFocusListener(new java.awt.event.FocusAdapter() {
+			@Override
+			public void focusGained(java.awt.event.FocusEvent e) {
+				if (systemRiskRulesPlaceholderActive) {
+					txtSystemRiskRulesYaml.setText("");
+					txtSystemRiskRulesYaml.setForeground(javax.swing.UIManager.getColor("TextArea.foreground"));
+					systemRiskRulesPlaceholderActive = false;
+				}
+			}
+			@Override
+			public void focusLost(java.awt.event.FocusEvent e) {
+				if (txtSystemRiskRulesYaml.getText().isBlank()) {
+					setSystemRiskRulesPlaceholder();
+				}
+			}
+		});
+
+		JScrollPane scrollYaml = new JScrollPane(txtSystemRiskRulesYaml);
+		panel.add(scrollYaml, BorderLayout.CENTER);
+
+		// Buttons
+		JPanel pnlButtons = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 6, 4));
+		JButton btnLoadFile = new JButton("Load File");
+		JButton btnSaveToFile = new JButton("Save to File");
+		JButton btnClear = new JButton("Clear");
+		pnlButtons.add(btnLoadFile);
+		pnlButtons.add(btnSaveToFile);
+		pnlButtons.add(btnClear);
+		panel.add(pnlButtons, BorderLayout.SOUTH);
+
+		btnLoadFile.addActionListener(e -> {
+			JFileChooser fc = new JFileChooser();
+			fc.setFileFilter(new FileNameExtensionFilter("YAML files", "yaml", "yml"));
+			if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+				try {
+					String content = java.nio.file.Files.readString(
+							fc.getSelectedFile().toPath(), java.nio.charset.StandardCharsets.UTF_8);
+					txtSystemRiskRulesYaml.setText(content);
+					txtSystemRiskRulesYaml.setForeground(javax.swing.UIManager.getColor("TextArea.foreground"));
+					systemRiskRulesPlaceholderActive = false;
+					chkSystemRiskRulesEnabled.setSelected(true);
+				} catch (java.io.IOException ex) {
+					javax.swing.JOptionPane.showMessageDialog(this,
+							"Failed to read file: " + ex.getMessage(),
+							"Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+				}
+			}
+		});
+
+		btnSaveToFile.addActionListener(e -> {
+			if (systemRiskRulesPlaceholderActive || txtSystemRiskRulesYaml.getText().isBlank()) return;
+			JFileChooser fc = new JFileChooser();
+			fc.setFileFilter(new FileNameExtensionFilter("YAML files", "yaml", "yml"));
+			fc.setSelectedFile(new java.io.File("system-riskrules.yaml"));
+			if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+				try {
+					java.nio.file.Files.writeString(
+							fc.getSelectedFile().toPath(), txtSystemRiskRulesYaml.getText(),
+							java.nio.charset.StandardCharsets.UTF_8);
+				} catch (java.io.IOException ex) {
+					javax.swing.JOptionPane.showMessageDialog(this,
+							"Failed to write file: " + ex.getMessage(),
+							"Error", javax.swing.JOptionPane.ERROR_MESSAGE);
+				}
+			}
+		});
+
+		btnClear.addActionListener(e -> {
+			chkSystemRiskRulesEnabled.setSelected(false);
+			setSystemRiskRulesPlaceholder();
+		});
+
+		return panel;
+	}
+
+	private void setSystemRiskRulesPlaceholder() {
+		txtSystemRiskRulesYaml.setText("# System risk rules — load defaults via the Default button");
+		txtSystemRiskRulesYaml.setForeground(Color.GRAY);
+		systemRiskRulesPlaceholderActive = true;
+	}
+
 	private JPanel buildUserRisksTab() {
 		JPanel panel = new JPanel(new BorderLayout(6, 6));
 		panel.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
@@ -2178,6 +2426,7 @@ public class FontChooserDialog extends JDialog {
 		// Compare cipher map / risk rules
 		if (prefs.isCustomCipherMapEnabled() != originalPrefs.isCustomCipherMapEnabled()) return true;
 		if (prefs.isUserRiskRulesEnabled() != originalPrefs.isUserRiskRulesEnabled()) return true;
+		if (prefs.isSystemRiskRulesEnabled() != originalPrefs.isSystemRiskRulesEnabled()) return true;
 		return false;
 	}
 
@@ -2247,6 +2496,7 @@ public class FontChooserDialog extends JDialog {
 		prefs.setSectionCertChain(chkCertChain.isSelected());
 		prefs.setSectionRevocation(chkRevocation.isSelected());
 		prefs.setSectionTlsFingerprint(chkTlsFingerprint.isSelected());
+		prefs.setSectionIncludeMetadata(chkIncludeMetadata.isSelected());
 		prefs.setCipherConvention((String) cmbCipherConvention.getSelectedItem());
 		prefs.setProtocolSslv3(chkSslv3.isSelected());
 		prefs.setProtocolTls10(chkTls10.isSelected());
@@ -2256,6 +2506,11 @@ public class FontChooserDialog extends JDialog {
 		prefs.setRiskScale((Integer) spnRiskScale.getValue());
 		prefs.setWorkerThreads((Integer) spnWorkerThreads.getValue());
 		prefs.setThrottleDelayMs((Integer) spnThrottleDelayMs.getValue());
+		prefs.setMaxRetries((Integer) spnMaxRetries.getValue());
+		prefs.setInitialRetryDelayMs((Integer) spnInitialRetryDelayMs.getValue());
+		prefs.setMaxRetryDelayMs((Integer) spnMaxRetryDelayMs.getValue());
+		prefs.setRetryBudgetMs((Integer) spnRetryBudgetMs.getValue());
+		prefs.setRestorePointInterval((Integer) spnRestorePointInterval.getValue());
 
 		// General settings
 		prefs.setSuppressSaveWarning(chkSuppressSaveWarning.isSelected());
@@ -2285,12 +2540,15 @@ public class FontChooserDialog extends JDialog {
 		prefs.setAiTerminalSelectionBg(btnAiTermSelectionBg.getBackground());
 		prefs.setAiTerminalSelectionFg(btnAiTermSelectionFg.getBackground());
 
-		// Cipher map / user risk rules
+		// Cipher map / risk rules
 		if (chkCipherMapEnabled != null) {
 			prefs.setCustomCipherMapEnabled(chkCipherMapEnabled.isSelected());
 		}
 		if (chkUserRiskRulesEnabled != null) {
 			prefs.setUserRiskRulesEnabled(chkUserRiskRulesEnabled.isSelected());
+		}
+		if (chkSystemRiskRulesEnabled != null) {
+			prefs.setSystemRiskRulesEnabled(chkSystemRiskRulesEnabled.isSelected());
 		}
 
 		// AI chat settings
@@ -2533,6 +2791,7 @@ public class FontChooserDialog extends JDialog {
 		copy.setSectionCertChain(src.isSectionCertChain());
 		copy.setSectionRevocation(src.isSectionRevocation());
 		copy.setSectionTlsFingerprint(src.isSectionTlsFingerprint());
+		copy.setSectionIncludeMetadata(src.isSectionIncludeMetadata());
 		copy.setCipherConvention(src.getCipherConvention());
 		copy.setProtocolSslv3(src.isProtocolSslv3());
 		copy.setProtocolTls10(src.isProtocolTls10());

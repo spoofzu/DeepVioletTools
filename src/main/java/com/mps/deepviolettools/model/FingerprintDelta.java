@@ -30,17 +30,12 @@ public class FingerprintDelta {
     private final String baseFingerprint;
     private final String targetFingerprint;
     private final boolean changed;
-    private final String baseHash;
-    private final String targetHash;
     private final List<ProbeDiff> probeDiffs;
 
     public FingerprintDelta(String baseFingerprint, String targetFingerprint,
-                            String baseHash, String targetHash,
                             List<ProbeDiff> probeDiffs) {
         this.baseFingerprint = baseFingerprint;
         this.targetFingerprint = targetFingerprint;
-        this.baseHash = baseHash;
-        this.targetHash = targetHash;
         this.probeDiffs = probeDiffs != null
                 ? Collections.unmodifiableList(probeDiffs)
                 : Collections.emptyList();
@@ -51,8 +46,6 @@ public class FingerprintDelta {
     public String getBaseFingerprint() { return baseFingerprint; }
     public String getTargetFingerprint() { return targetFingerprint; }
     public boolean isChanged() { return changed; }
-    public String getBaseHash() { return baseHash; }
-    public String getTargetHash() { return targetHash; }
     public List<ProbeDiff> getProbeDiffs() { return probeDiffs; }
 
     public boolean hasChanges() { return changed; }

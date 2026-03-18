@@ -38,7 +38,7 @@ Scan multiple targets concurrently and compare results with heat map visualizati
 
 ### Report Export
 
-Save scan reports in multiple formats: ASCII text, Rich Text (RTF), HTML, PDF, or JSON.
+Save scan reports in multiple formats: text, HTML, PDF, or JSON.
 
 ![DeepViolet GUI — Report Export](media/dvreportsave.png)
 
@@ -87,8 +87,17 @@ java -jar dvcli.jar --validate expired.badssl.com
 | `--proto-tls11` | Enable TLS 1.1 protocol testing |
 | `--proto-tls12` | Enable TLS 1.2 protocol testing |
 | `--proto-tls13` | Enable TLS 1.3 protocol testing |
+| `--max-retries` | Max retry attempts per section (0–10, default 3) |
+| `--retry-delay` | Initial retry delay in ms (100–10000, default 500) |
+| `--retry-max-delay` | Max retry delay in ms (100–30000, default 4000) |
+| `--retry-budget` | Total retry budget in ms (1000–120000, default 15000) |
+| `--restore-point` | Save checkpoint every N hosts (5–1000, default 20) |
+| `--resume` | Resume scan from last checkpoint if available |
 | `--ciphermap` | Custom cipher map YAML file (replaces built-in) |
 | `--riskrules` | User risk rules YAML file (merged with system rules) |
+| `--sysriskrules` | System risk rules overlay YAML file (replaces built-in) |
+| `--password-env` | Env var name containing transfer password for .dvscan files |
+| `--password-file` | File containing transfer password for .dvscan files |
 | `-d` | Enable SSL/TLS debugging |
 | `-d2` | Enable debug logging |
 | `--ai` | Enable AI evaluation section in report |
@@ -114,7 +123,7 @@ java -jar dvcli.jar --validate expired.badssl.com
 | `s` | Server certificate chain with trust state |
 | `n` | Certificate chain (alias for `s`) |
 | `v` | Revocation status (OCSP, CRL, OneCRL, CT/SCTs) |
-| `f` | TLS server fingerprint |
+| `f` | TLS Probe Fingerprint |
 
 Example: `java -jar dvcli.jar -serverurl https://github.com/ -s aecsf`
 
@@ -125,13 +134,13 @@ Example: `java -jar dvcli.jar -serverurl https://github.com/ -s aecsf`
 - **Cipher Suite Enumeration** — All supported ciphers with strength evaluation (IANA, OpenSSL, GnuTLS, or NSS naming). Replaceable cipher map via custom YAML definitions.
 - **Revocation Checking** — OCSP, OCSP Stapling, CRL, OneCRL, Must-Staple, Certificate Transparency (SCT signature verification from embedded, TLS extension, and OCSP staple sources)
 - **Security Headers** — HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Permissions-Policy, and more
-- **TLS Fingerprinting** — JARM-inspired 10-probe fingerprinting that characterizes server TLS behavior for grouping and change detection
+- **TLS Probe Fingerprinting** — JARM-inspired 10-probe fingerprinting that characterizes server TLS behavior for grouping and change detection
 - **DNS Security** — CAA and DANE/TLSA record checking
 - **Fallback SCSV** — RFC 7507 TLS Fallback Signaling detection
 - **Multi-Target Scanning** — Scan multiple targets concurrently with configurable worker threads (1–10), throttle delay, and CIDR/range expansion. Supports hostnames, IPv4/IPv6, CIDR blocks, and dash ranges.
 - **Heat Map Visualization** — 7-dimension color-coded grids comparing scan results across hosts (Risk, Ciphers, Security Headers, Connection, HTTP Response, Revocation, Fingerprint)
 - **AI Assistant** — Ask questions about scan results using OpenAI, Anthropic, or local Ollama models
-- **Multi-format Export** — Save reports as text, RTF, HTML, PDF, or JSON
+- **Multi-format Export** — Save reports as text, HTML, PDF, or JSON
 - **Card Layout Editor** — Drag-and-drop grid editor for customizing scan host cards: element placement, multi-cell spanning, cell alignment (Shift+click), resizable grid proportions, and live card preview
 - **Theme Support** — Dark, light, and system presets with full color customization
 - **Configurable Engine** — Choose report sections, cipher naming convention, and protocol versions via **System > Settings**
@@ -154,6 +163,16 @@ mvn clean package
 Produces two uber JARs in `target/`:
 - `dvui.jar` — GUI application
 - `dvcli.jar` — Command-line tool
+
+### Development Build with Local DV API
+
+A `dev` Maven profile activates automatically when the sibling [DeepViolet](https://github.com/spoofzu/DeepViolet) API has been built locally (`../DeepViolet/target/classes` exists). This makes it easy to toggle between testing local API changes and the latest production release:
+
+```bash
+# In ../DeepViolet/
+mvn install          # Builds DV API → activates dev profile in Tools (uses local SNAPSHOT)
+mvn clean            # Removes target/ → deactivates dev profile (Tools grabs latest from Maven Central)
+```
 
 ## Documentation
 

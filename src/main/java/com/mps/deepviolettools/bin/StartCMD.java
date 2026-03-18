@@ -45,7 +45,7 @@ import com.mps.deepviolettools.util.TargetParser;
  * a=risk assessment, e=runtime environment, h=host, r=HTTP response,
  * c=connection characteristics, i=cipher suites, s=server certificate,
  * n=certificate chain, v=revocation status, x=security headers,
- * f=TLS fingerprint.</p>
+ * f=TLS Probe Fingerprint.</p>
  *
  * @author Milton Smith
  */
@@ -106,10 +106,24 @@ public class StartCMD {
 					"Optional, worker thread count for scan mode (default: 3, range 1-10).");
 			options.addOption(null, "scan-throttle", true,
 					"Optional, delay in ms between hosts in scan mode (default: 150, range 0-10000).");
+			options.addOption(null, "max-retries", true,
+					"Optional, max connection retry attempts per section (default: 3, range 0-10).");
+			options.addOption(null, "retry-delay", true,
+					"Optional, initial retry delay in ms (default: 500, range 100-10000).");
+			options.addOption(null, "retry-max-delay", true,
+					"Optional, max retry delay in ms (default: 4000, range 100-30000).");
+			options.addOption(null, "retry-budget", true,
+					"Optional, total retry budget in ms (default: 15000, range 1000-120000).");
+			options.addOption(null, "restore-point", true,
+					"Optional, save checkpoint every N hosts (default: 20, range 5-1000).");
+			options.addOption(null, "resume", false,
+					"Optional, resume scan from last checkpoint if available.");
 			options.addOption(null, "ciphermap", true,
 					"Optional, custom cipher map YAML file (replaces built-in).");
 			options.addOption(null, "riskrules", true,
 					"Optional, user risk rules YAML file (merged with system rules).");
+			options.addOption(null, "sysriskrules", true,
+					"Optional, system risk rules overlay YAML file (replaces built-in).");
 			options.addOption(null, "password-env", true,
 					"Optional, env var name containing transfer password for .dvscan files.");
 			options.addOption(null, "password-file", true,
@@ -217,7 +231,7 @@ public class StartCMD {
 				hm.append("c=connection characteristics section, i=cipher suites section,").append(EOL);
 				hm.append("s=server certificate section, n=certificate chain section,").append(EOL);
 				hm.append("v=certificate revocation status section, x=security headers analysis,").append(EOL);
-				hm.append("f=TLS server fingerprint section").append(EOL);
+				hm.append("f=TLS Probe Fingerprint section").append(EOL);
 				hm.append("--ai Enable AI evaluation section in report").append(EOL);
 				hm.append("--ai-provider AI provider: anthropic, openai, ollama (default: from saved config)").append(EOL);
 				hm.append("--ai-model AI model name (default: from saved config)").append(EOL);
@@ -237,6 +251,12 @@ public class StartCMD {
 				hm.append("--scan-file File containing targets (one per line, # comments)").append(EOL);
 				hm.append("--scan-threads Worker thread count (default: 3, range 1-10)").append(EOL);
 				hm.append("--scan-throttle Delay in ms between hosts (default: 150, range 0-10000)").append(EOL);
+				hm.append("--max-retries  Max retry attempts per section (default: 3, range 0-10)").append(EOL);
+				hm.append("--retry-delay  Initial retry delay in ms (default: 500, range 100-10000)").append(EOL);
+				hm.append("--retry-max-delay Max retry delay in ms (default: 4000, range 100-30000)").append(EOL);
+				hm.append("--retry-budget Total retry budget in ms (default: 15000, range 1000-120000)").append(EOL);
+				hm.append("--restore-point Save checkpoint every N hosts (default: 20, range 5-1000)").append(EOL);
+				hm.append("--resume        Resume scan from last checkpoint if available").append(EOL);
 				hm.append("").append(EOL);
 				hm.append("Delta scanning:").append(EOL);
 				hm.append("Ex: dvcli.jar --delta base.dvscan,target.dvscan").append(EOL);
@@ -246,6 +266,7 @@ public class StartCMD {
 				hm.append("Custom overlays:").append(EOL);
 				hm.append("--ciphermap <path> Custom cipher map YAML file (replaces built-in)").append(EOL);
 				hm.append("--riskrules <path> User risk rules YAML file (merged with system rules)").append(EOL);
+				hm.append("--sysriskrules <path> System risk rules overlay YAML file (replaces built-in)").append(EOL);
 				hm.append("").append(EOL);
 				hm.append("Transfer password (for cross-machine .dvscan files):").append(EOL);
 				hm.append("--password-env <var> Env var name containing transfer password").append(EOL);
@@ -380,7 +401,7 @@ public class StartCMD {
 					// Print security headers analysis section
 					st.bSecurityHeadersSection = section_options.lastIndexOf('x') > -1;
 
-					// Print TLS server fingerprint section
+					// Print TLS Probe Fingerprint section
 					st.bTlsFingerprintSection = section_options.lastIndexOf('f') > -1;
 
 					st.bReadCertificate = false;
@@ -443,6 +464,25 @@ public class StartCMD {
 				}
 			}
 
+			// System risk rules overlay
+			if (cmdline.hasOption("sysriskrules")) {
+				File srrFile = new File(cmdline.getOptionValue("sysriskrules"));
+				if (!srrFile.exists()) {
+					logger.error("System risk rules file not found: " + srrFile.getAbsolutePath());
+					System.exit(-1);
+				}
+				st.setSystemRiskRulesYaml(java.nio.file.Files.readString(
+						srrFile.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+			} else {
+				FontPreferences savedPrefs2b = FontPreferences.load();
+				if (savedPrefs2b.isSystemRiskRulesEnabled()) {
+					String srrYaml = FontPreferences.loadSystemRiskRulesYaml();
+					if (srrYaml != null && !srrYaml.isBlank()) {
+						st.setSystemRiskRulesYaml(srrYaml);
+					}
+				}
+			}
+
 			// User risk rules
 			if (cmdline.hasOption("riskrules")) {
 				File rrFile = new File(cmdline.getOptionValue("riskrules"));
@@ -488,7 +528,7 @@ public class StartCMD {
 				hideSections.add("Chain details");
 			}
 			if (!st.bRevocationSection) hideSections.add("Certificate revocation status");
-			if (!st.bTlsFingerprintSection) hideSections.add("TLS server fingerprint");
+			if (!st.bTlsFingerprintSection) hideSections.add("TLS Probe Fingerprint");
 			if (!hideSections.isEmpty()) {
 				st.getResultTree().removeSections(hideSections);
 			}
@@ -682,6 +722,93 @@ public class StartCMD {
 		}
 		scanTask.setThrottleDelayMs(throttleDelay);
 
+		// Connection retry settings
+		int maxRetries = prefs.getMaxRetries();
+		if (cmdline.hasOption("max-retries")) {
+			try {
+				maxRetries = Integer.parseInt(cmdline.getOptionValue("max-retries"));
+				maxRetries = Math.max(0, Math.min(10, maxRetries));
+			} catch (NumberFormatException e) {
+				logger.warn("Invalid max-retries value, using default: " + maxRetries);
+			}
+		}
+		scanTask.setMaxRetries(maxRetries);
+
+		long initialRetryDelay = prefs.getInitialRetryDelayMs();
+		if (cmdline.hasOption("retry-delay")) {
+			try {
+				initialRetryDelay = Long.parseLong(cmdline.getOptionValue("retry-delay"));
+				initialRetryDelay = Math.max(100, Math.min(10000, initialRetryDelay));
+			} catch (NumberFormatException e) {
+				logger.warn("Invalid retry-delay value, using default: " + initialRetryDelay);
+			}
+		}
+		scanTask.setInitialRetryDelayMs(initialRetryDelay);
+
+		long maxRetryDelay = prefs.getMaxRetryDelayMs();
+		if (cmdline.hasOption("retry-max-delay")) {
+			try {
+				maxRetryDelay = Long.parseLong(cmdline.getOptionValue("retry-max-delay"));
+				maxRetryDelay = Math.max(100, Math.min(30000, maxRetryDelay));
+			} catch (NumberFormatException e) {
+				logger.warn("Invalid retry-max-delay value, using default: " + maxRetryDelay);
+			}
+		}
+		scanTask.setMaxRetryDelayMs(maxRetryDelay);
+
+		long retryBudget = prefs.getRetryBudgetMs();
+		if (cmdline.hasOption("retry-budget")) {
+			try {
+				retryBudget = Long.parseLong(cmdline.getOptionValue("retry-budget"));
+				retryBudget = Math.max(1000, Math.min(120000, retryBudget));
+			} catch (NumberFormatException e) {
+				logger.warn("Invalid retry-budget value, using default: " + retryBudget);
+			}
+		}
+		scanTask.setRetryBudgetMs(retryBudget);
+
+		// Restore point — checkpoint every N hosts
+		int restoreInterval = prefs.getRestorePointInterval();
+		if (cmdline.hasOption("restore-point")) {
+			try {
+				restoreInterval = Integer.parseInt(cmdline.getOptionValue("restore-point"));
+				restoreInterval = Math.max(5, Math.min(1000, restoreInterval));
+			} catch (NumberFormatException e) {
+				logger.warn("Invalid restore-point value, using default: " + restoreInterval);
+			}
+		}
+		scanTask.setRestorePointInterval(restoreInterval);
+
+		// Checkpoint file in scans directory
+		File scansDir = new File(FontPreferences.getHomeDir(), "ui" + File.separator + "scans");
+		scansDir.mkdirs();
+		File checkpointFile = new File(scansDir, ".scan-checkpoint.dvscan");
+
+		// Resume from checkpoint if requested
+		if (cmdline.hasOption("resume") && checkpointFile.exists()) {
+			try {
+				ScanResult checkpoint = ReportExporter.loadScanFile(checkpointFile, null);
+				scanTask.resumeFrom(checkpoint);
+				System.out.println("Resuming from checkpoint: " + checkpoint.getResults().size()
+						+ " hosts already scanned");
+			} catch (IOException ex) {
+				logger.warn("Failed to load checkpoint, starting fresh: {}", ex.getMessage());
+			}
+		}
+
+		// Wire checkpoint callback — saves every N hosts
+		scanTask.setCheckpointCallback(result -> {
+			try {
+				File tmpFile = new File(scansDir, ".scan-checkpoint.tmp");
+				ReportExporter.saveScanFile(tmpFile, result);
+				if (checkpointFile.exists()) checkpointFile.delete();
+				tmpFile.renameTo(checkpointFile);
+				logger.info("Checkpoint saved: {} hosts completed", result.getResults().size());
+			} catch (Exception e) {
+				logger.warn("Failed to save checkpoint: {}", e.getMessage());
+			}
+		});
+
 		// Custom cipher map
 		if (cmdline.hasOption("ciphermap")) {
 			File cmFile = new File(cmdline.getOptionValue("ciphermap"));
@@ -696,6 +823,23 @@ public class StartCMD {
 			if (cmYaml != null && !cmYaml.isBlank()) {
 				DeepVioletFactory.loadCipherMap(new java.io.ByteArrayInputStream(
 						cmYaml.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+			}
+		}
+
+		// System risk rules overlay
+		if (cmdline.hasOption("sysriskrules")) {
+			File srrFile = new File(cmdline.getOptionValue("sysriskrules"));
+			if (!srrFile.exists()) {
+				logger.error("System risk rules file not found: " + srrFile.getAbsolutePath());
+				System.exit(-1);
+				return;
+			}
+			scanTask.setSystemRiskRulesYaml(java.nio.file.Files.readString(
+					srrFile.toPath(), java.nio.charset.StandardCharsets.UTF_8));
+		} else if (prefs.isSystemRiskRulesEnabled()) {
+			String srrYaml = FontPreferences.loadSystemRiskRulesYaml();
+			if (srrYaml != null && !srrYaml.isBlank()) {
+				scanTask.setSystemRiskRulesYaml(srrYaml);
 			}
 		}
 
@@ -727,6 +871,11 @@ public class StartCMD {
 
 		ScanResult result = scanTask.getResult();
 		long finish = System.currentTimeMillis();
+
+		// Clean up checkpoint file — scan completed
+		if (checkpointFile.exists()) {
+			checkpointFile.delete();
+		}
 
 		// Summary
 		System.out.println();

@@ -6,11 +6,11 @@
 
     <groupId>com.mps.violet</groupId>
     <artifactId>DeepVioletTools</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>6.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>DeepVioletTools</name>
-    <description>TLS/SSL security scanning tools - GUI and CLI reference implementations for the DeepViolet API.</description>
+    <description>DeepViolet TLS Workbench desktop app and Command Line interface.</description>
     <url>https://github.com/spoofzu/DeepVioletTools/</url>
 
     <licenses>
@@ -23,9 +23,9 @@
     <developers>
         <developer>
             <name>Milton Smith</name>
-            <email>milton.smith@owasp.org</email>
-            <organization>OWASP</organization>
-            <organizationUrl>https://www.owasp.org/index.php/OWASP_DeepViolet_TLS/SSL_Scanner</organizationUrl>
+            <email>milton.smith.rr@gmail.com</email>
+            <organization>Independent</organization>
+            <organizationUrl></organizationUrl>
         </developer>
     </developers>
 
@@ -39,8 +39,12 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>21</java.version>
 
-        <!-- DeepViolet API (Sonatype Central) -->
-        <deepviolet.version>5.2.0</deepviolet.version>
+        <!-- DeepViolet API — latest release from Maven Central.
+             The 'dev' profile (below) overrides this to a local SNAPSHOT
+             when the sibling DeepViolet repo has been built (target/classes exists).
+             mvn clean on DeepViolet switches back to Central automatically. -->
+        <deepviolet.version>LATEST</deepviolet.version>
+        <deepviolet.mode>RELEASE (latest from Central)</deepviolet.mode>
 
         <!-- Dependencies - aligned with DeepViolet API -->
         <logback.version>1.5.6</logback.version>
@@ -119,6 +123,28 @@
 
     <build>
         <plugins>
+            <!-- Print DeepViolet API dependency mode at build start -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>print-dv-mode</id>
+                        <phase>validate</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <echo level="info">========================================================</echo>
+                                <echo level="info">  DeepViolet API : ${deepviolet.mode}</echo>
+                                <echo level="info">  Artifact       : com.github.spoofzu:DeepViolet:${deepviolet.version}</echo>
+                                <echo level="info">========================================================</echo>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <!-- Compiler plugin for Java 21 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -229,4 +255,28 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+            Activated automatically when the sibling DeepViolet repo has been
+            built (target/classes exists).  Uses the locally-installed SNAPSHOT
+            so dev builds pick up API changes without a Central publish.
+
+            Workflow:
+              mvn install  (on DeepViolet)  → target/classes created → SNAPSHOT used
+              mvn clean    (on DeepViolet)  → target/classes removed → latest Central release used
+        -->
+        <profile>
+            <id>dev</id>
+            <activation>
+                <file>
+                    <exists>${basedir}/../DeepViolet/target/classes</exists>
+                </file>
+            </activation>
+            <properties>
+                <deepviolet.version>6.1.0-SNAPSHOT</deepviolet.version>
+                <deepviolet.mode>DEV (local SNAPSHOT)</deepviolet.mode>
+            </properties>
+        </profile>
+    </profiles>
 </project>
