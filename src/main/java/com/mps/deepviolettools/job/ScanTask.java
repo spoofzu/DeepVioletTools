@@ -3,6 +3,7 @@ package com.mps.deepviolettools.job;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -11,12 +12,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.mps.deepviolet.api.DeepVioletException;
 import com.mps.deepviolet.api.ISession.CIPHER_NAME_CONVENTION;
+import com.mps.deepviolet.api.RetryPolicy;
 import com.mps.deepviolettools.model.ScanResult;
 import com.mps.deepviolettools.model.ScanResult.HostResult;
 
@@ -153,6 +156,9 @@ public class ScanTask implements Runnable {
 	/** User risk rules YAML to propagate to each subtask. */
 	private volatile String userRiskRulesYaml;
 
+	/** System risk rules overlay YAML to propagate to each subtask. */
+	private volatile String systemRiskRulesYaml;
+
 	// AI evaluation settings to propagate to each subtask
 	private boolean bAiEvaluationSection = false;
 	private String aiApiKey = "";
@@ -165,6 +171,19 @@ public class ScanTask implements Runnable {
 
 	private int workerThreadCount = 1;
 	private long throttleDelayMs = 0;
+
+	// Connection retry settings
+	private int maxRetries = 3;
+	private long initialRetryDelayMs = 500;
+	private long maxRetryDelayMs = 4000;
+	private long retryBudgetMs = 15000;
+
+	// Checkpoint / restore point settings
+	private int restorePointInterval = 20;
+	private Consumer<ScanResult> checkpointCallback;
+
+	// Resume support — targets already scanned in a previous checkpoint
+	private Set<String> resumeSkipUrls;
 
 	/** Callback: (currentIndex, currentTarget) */
 	private BiConsumer<Integer, String> progressCallback;
@@ -223,6 +242,47 @@ public class ScanTask implements Runnable {
 		this.throttleDelayMs = Math.max(0, Math.min(10000, delayMs));
 	}
 
+	public void setMaxRetries(int v) {
+		this.maxRetries = Math.max(0, Math.min(10, v));
+	}
+
+	public void setInitialRetryDelayMs(long v) {
+		this.initialRetryDelayMs = Math.max(100, Math.min(10000, v));
+	}
+
+	public void setMaxRetryDelayMs(long v) {
+		this.maxRetryDelayMs = Math.max(100, Math.min(30000, v));
+	}
+
+	public void setRetryBudgetMs(long v) {
+		this.retryBudgetMs = Math.max(1000, Math.min(120000, v));
+	}
+
+	public void setRestorePointInterval(int v) {
+		this.restorePointInterval = Math.max(5, Math.min(1000, v));
+	}
+
+	/**
+	 * Set a callback that receives a snapshot of current results every
+	 * {@code restorePointInterval} completed hosts. The callback runs
+	 * on a worker thread — implementations must handle thread safety.
+	 */
+	public void setCheckpointCallback(Consumer<ScanResult> callback) {
+		this.checkpointCallback = callback;
+	}
+
+	/**
+	 * Pre-load results from a checkpoint and skip those targets on resume.
+	 * Call before {@link #start()}.
+	 */
+	public void resumeFrom(ScanResult checkpoint) {
+		this.resumeSkipUrls = checkpoint.getCompletedTargetUrls();
+		this.result.mergeCheckpoint(checkpoint);
+		this.successCount.set(checkpoint.getSuccessCount());
+		this.errorCount.set(checkpoint.getErrorCount());
+		this.completedCount.set(checkpoint.getResults().size());
+	}
+
 	/**
 	 * Set user risk rules YAML to propagate to each subtask.
 	 *
@@ -230,6 +290,15 @@ public class ScanTask implements Runnable {
 	 */
 	public void setUserRiskRulesYaml(String yaml) {
 		this.userRiskRulesYaml = yaml;
+	}
+
+	/**
+	 * Set system risk rules overlay YAML to propagate to each subtask.
+	 *
+	 * @param yaml the YAML content, or null to use built-in system rules
+	 */
+	public void setSystemRiskRulesYaml(String yaml) {
+		this.systemRiskRulesYaml = yaml;
 	}
 
 	/**
@@ -318,7 +387,19 @@ public class ScanTask implements Runnable {
 				scanSessionId, targetUrls.size(), effectiveWorkers);
 		targetStates = new AtomicIntegerArray(targetUrls.size());
 		ConcurrentLinkedQueue<Integer> indexQueue = new ConcurrentLinkedQueue<>();
-		for (int i = 0; i < targetUrls.size(); i++) indexQueue.add(i);
+		for (int i = 0; i < targetUrls.size(); i++) {
+			// Skip targets already completed in a resumed checkpoint
+			if (resumeSkipUrls != null && resumeSkipUrls.contains(targetUrls.get(i))) {
+				targetStates.set(i, TARGET_FINISHED);
+				continue;
+			}
+			indexQueue.add(i);
+		}
+		int skipped = (resumeSkipUrls != null) ? resumeSkipUrls.size() : 0;
+		if (skipped > 0) {
+			scanlog.info("multi-target({}) Resuming — skipping {} already-scanned targets",
+					scanSessionId, skipped);
+		}
 
 		// Initialize worker statuses
 		WorkerStatus[] statuses = new WorkerStatus[effectiveWorkers];
@@ -412,11 +493,15 @@ public class ScanTask implements Runnable {
 				if (userRiskRulesYaml != null) {
 					st.setUserRiskRulesYaml(userRiskRulesYaml);
 				}
+				if (systemRiskRulesYaml != null) {
+					st.setSystemRiskRulesYaml(systemRiskRulesYaml);
+				}
 				if (bAiEvaluationSection) {
 					st.bAiEvaluationSection = true;
 					st.setAiConfig(aiApiKey, aiProvider, aiModel,
 							aiMaxTokens, aiTemperature, aiSystemPrompt, aiEndpointUrl);
 				}
+				st.setRetryPolicy(buildRetryPolicy());
 
 				// Start scanning
 				targetStates.set(idx, TARGET_WORKING);
@@ -463,9 +548,19 @@ public class ScanTask implements Runnable {
 			}
 
 			result.addResult(hostResult);
-			completedCount.incrementAndGet();
+			int completed = completedCount.incrementAndGet();
 			targetStates.set(idx, TARGET_FINISHED);
 			status.finishTarget();
+
+			// Checkpoint — save restore point every N completed hosts
+			if (checkpointCallback != null && restorePointInterval > 0
+					&& completed % restorePointInterval == 0) {
+				try {
+					checkpointCallback.accept(result);
+				} catch (Exception e) {
+					logger.warn("Checkpoint save failed at {} hosts: {}", completed, e.getMessage());
+				}
+			}
 
 			// Throttle delay between targets (if configured)
 			if (throttleDelayMs > 0 && !cancelled) {
@@ -480,6 +575,16 @@ public class ScanTask implements Runnable {
 
 		// No more targets for this worker
 		status.setIdle();
+	}
+
+	private RetryPolicy buildRetryPolicy() {
+		if (maxRetries == 0) return RetryPolicy.disabled();
+		return RetryPolicy.builder()
+				.maxRetries(maxRetries)
+				.initialDelayMs(initialRetryDelayMs)
+				.maxDelayMs(maxRetryDelayMs)
+				.retryBudgetMs(retryBudgetMs)
+				.build();
 	}
 
 	/** Start the scan on a new daemon thread. */

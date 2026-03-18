@@ -247,6 +247,7 @@ public class FontPreferences {
 	private static final String KEY_SECTION_CERT_CHAIN = "engine.section.certChain";
 	private static final String KEY_SECTION_REVOCATION = "engine.section.revocation";
 	private static final String KEY_SECTION_TLS_FINGERPRINT = "engine.section.tlsFingerprint";
+	private static final String KEY_SECTION_INCLUDE_METADATA = "engine.section.includeMetadata";
 	private static final String KEY_CIPHER_CONVENTION = "engine.cipherConvention";
 	private static final String KEY_PROTOCOL_SSLV3 = "engine.protocol.sslv3";
 	private static final String KEY_PROTOCOL_TLS10 = "engine.protocol.tls10";
@@ -258,17 +259,24 @@ public class FontPreferences {
 	private static final String KEY_WORKER_THREADS = "engine.workerThreads";
 	private static final String KEY_THROTTLE_DELAY_MS = "engine.throttleDelayMs";
 	private static final String KEY_MAX_CIDR_EXPANSION = "engine.maxCidrExpansion";
+	private static final String KEY_MAX_RETRIES = "engine.maxRetries";
+	private static final String KEY_INITIAL_RETRY_DELAY_MS = "engine.initialRetryDelayMs";
+	private static final String KEY_MAX_RETRY_DELAY_MS = "engine.maxRetryDelayMs";
+	private static final String KEY_RETRY_BUDGET_MS = "engine.retryBudgetMs";
+	private static final String KEY_RESTORE_POINT_INTERVAL = "engine.restorePointInterval";
 
 	// Legacy batch keys — used only for migration fallback in load()
 	private static final String KEY_BATCH_WORKER_THREADS = "batch.workerThreads";
 	private static final String KEY_BATCH_THROTTLE_DELAY_MS = "batch.throttleDelayMs";
 	private static final String KEY_BATCH_MAX_CIDR_EXPANSION = "batch.maxCidrExpansion";
 
-	// Custom cipher map / user risk rules keys
+	// Custom cipher map / risk rules keys
 	private static final String KEY_CUSTOM_CIPHER_MAP_ENABLED = "engine.customCipherMapEnabled";
 	private static final String KEY_USER_RISK_RULES_ENABLED = "engine.userRiskRulesEnabled";
+	private static final String KEY_SYSTEM_RISK_RULES_ENABLED = "engine.systemRiskRulesEnabled";
 	private static final String CUSTOM_CIPHER_MAP_FILE = "custom-ciphermap.yaml";
 	private static final String USER_RISK_RULES_FILE = "user-riskrules.yaml";
+	private static final String SYSTEM_RISK_RULES_FILE = "system-riskrules.yaml";
 	private static final String RISK_RULES_DIR = "risk-rules";
 	private static final String CIPHER_MAP_DIR = "ciphermap";
 
@@ -493,6 +501,7 @@ public class FontPreferences {
 	private boolean sectionCertChain = true;
 	private boolean sectionRevocation = true;
 	private boolean sectionTlsFingerprint = true;
+	private boolean sectionIncludeMetadata = true;
 	private String cipherConvention = "IANA";
 	private boolean protocolSslv3 = false;
 	private boolean protocolTls10 = false;
@@ -508,6 +517,13 @@ public class FontPreferences {
 	private int workerThreads = 3;
 	private long throttleDelayMs = 150;
 	private int maxCidrExpansion = TargetParser.DEFAULT_MAX_CIDR_EXPANSION;
+
+	// Connection retry settings (defaults match RetryPolicy.defaults() in DV API)
+	private int maxRetries = 3;
+	private long initialRetryDelayMs = 500;
+	private long maxRetryDelayMs = 4000;
+	private long retryBudgetMs = 15000;
+	private int restorePointInterval = 50;
 
 	// AI report configuration fields
 	private boolean aiReportEnabled = false;
@@ -541,9 +557,10 @@ public class FontPreferences {
 	private Color aiTerminalSelectionBg = DEFAULT_AI_TERMINAL_SELECTION_BG;
 	private Color aiTerminalSelectionFg = DEFAULT_AI_TERMINAL_SELECTION_FG;
 
-	// Custom cipher map / user risk rules fields
+	// Custom cipher map / risk rules fields
 	private boolean customCipherMapEnabled = false;
 	private boolean userRiskRulesEnabled = true;
+	private boolean systemRiskRulesEnabled = false;
 
 	// Application theme fields
 	private boolean appThemeCustom = false;
@@ -642,6 +659,7 @@ public class FontPreferences {
 		fp.sectionCertChain = !"false".equalsIgnoreCase(props.getProperty(KEY_SECTION_CERT_CHAIN));
 		fp.sectionRevocation = !"false".equalsIgnoreCase(props.getProperty(KEY_SECTION_REVOCATION));
 		fp.sectionTlsFingerprint = !"false".equalsIgnoreCase(props.getProperty(KEY_SECTION_TLS_FINGERPRINT));
+		fp.sectionIncludeMetadata = !"false".equalsIgnoreCase(props.getProperty(KEY_SECTION_INCLUDE_METADATA));
 		fp.cipherConvention = props.getProperty(KEY_CIPHER_CONVENTION, "IANA");
 		fp.protocolSslv3 = "true".equalsIgnoreCase(props.getProperty(KEY_PROTOCOL_SSLV3, "false"));
 		fp.protocolTls10 = "true".equalsIgnoreCase(props.getProperty(KEY_PROTOCOL_TLS10, "false"));
@@ -676,6 +694,37 @@ public class FontPreferences {
 			fp.maxCidrExpansion = Math.max(1, Math.min(1_000_000, Integer.parseInt(mc)));
 		} catch (NumberFormatException e) {
 			fp.maxCidrExpansion = TargetParser.DEFAULT_MAX_CIDR_EXPANSION;
+		}
+		// Connection retry settings
+		try {
+			fp.maxRetries = Math.max(0, Math.min(10,
+					Integer.parseInt(props.getProperty(KEY_MAX_RETRIES, "3"))));
+		} catch (NumberFormatException e) {
+			fp.maxRetries = 3;
+		}
+		try {
+			fp.initialRetryDelayMs = Math.max(100, Math.min(10000,
+					Long.parseLong(props.getProperty(KEY_INITIAL_RETRY_DELAY_MS, "500"))));
+		} catch (NumberFormatException e) {
+			fp.initialRetryDelayMs = 500;
+		}
+		try {
+			fp.maxRetryDelayMs = Math.max(100, Math.min(30000,
+					Long.parseLong(props.getProperty(KEY_MAX_RETRY_DELAY_MS, "4000"))));
+		} catch (NumberFormatException e) {
+			fp.maxRetryDelayMs = 4000;
+		}
+		try {
+			fp.retryBudgetMs = Math.max(1000, Math.min(120000,
+					Long.parseLong(props.getProperty(KEY_RETRY_BUDGET_MS, "15000"))));
+		} catch (NumberFormatException e) {
+			fp.retryBudgetMs = 15000;
+		}
+		try {
+			fp.restorePointInterval = Math.max(5, Math.min(1000,
+					Integer.parseInt(props.getProperty(KEY_RESTORE_POINT_INTERVAL, "50"))));
+		} catch (NumberFormatException e) {
+			fp.restorePointInterval = 50;
 		}
 
 		// AI report configuration
@@ -752,11 +801,13 @@ public class FontPreferences {
 		fp.aiTerminalSelectionBg = readColor(props, KEY_AI_TERMINAL_SELECTION_BG, DEFAULT_AI_TERMINAL_SELECTION_BG);
 		fp.aiTerminalSelectionFg = readColor(props, KEY_AI_TERMINAL_SELECTION_FG, DEFAULT_AI_TERMINAL_SELECTION_FG);
 
-		// Custom cipher map / user risk rules
+		// Custom cipher map / risk rules
 		fp.customCipherMapEnabled = "true".equalsIgnoreCase(
 				props.getProperty(KEY_CUSTOM_CIPHER_MAP_ENABLED, "false"));
 		fp.userRiskRulesEnabled = "true".equalsIgnoreCase(
 				props.getProperty(KEY_USER_RISK_RULES_ENABLED, "true"));
+		fp.systemRiskRulesEnabled = "true".equalsIgnoreCase(
+				props.getProperty(KEY_SYSTEM_RISK_RULES_ENABLED, "false"));
 
 		// Application theme
 		fp.appThemeCustom = "true".equalsIgnoreCase(
@@ -886,6 +937,7 @@ public class FontPreferences {
 		props.setProperty(KEY_SECTION_CERT_CHAIN, String.valueOf(fp.sectionCertChain));
 		props.setProperty(KEY_SECTION_REVOCATION, String.valueOf(fp.sectionRevocation));
 		props.setProperty(KEY_SECTION_TLS_FINGERPRINT, String.valueOf(fp.sectionTlsFingerprint));
+		props.setProperty(KEY_SECTION_INCLUDE_METADATA, String.valueOf(fp.sectionIncludeMetadata));
 		props.setProperty(KEY_CIPHER_CONVENTION, fp.cipherConvention);
 		props.setProperty(KEY_PROTOCOL_SSLV3, String.valueOf(fp.protocolSslv3));
 		props.setProperty(KEY_PROTOCOL_TLS10, String.valueOf(fp.protocolTls10));
@@ -896,6 +948,11 @@ public class FontPreferences {
 		props.setProperty(KEY_WORKER_THREADS, String.valueOf(fp.workerThreads));
 		props.setProperty(KEY_THROTTLE_DELAY_MS, String.valueOf(fp.throttleDelayMs));
 		props.setProperty(KEY_MAX_CIDR_EXPANSION, String.valueOf(fp.maxCidrExpansion));
+		props.setProperty(KEY_MAX_RETRIES, String.valueOf(fp.maxRetries));
+		props.setProperty(KEY_INITIAL_RETRY_DELAY_MS, String.valueOf(fp.initialRetryDelayMs));
+		props.setProperty(KEY_MAX_RETRY_DELAY_MS, String.valueOf(fp.maxRetryDelayMs));
+		props.setProperty(KEY_RETRY_BUDGET_MS, String.valueOf(fp.retryBudgetMs));
+		props.setProperty(KEY_RESTORE_POINT_INTERVAL, String.valueOf(fp.restorePointInterval));
 
 		// AI report configuration
 		props.setProperty(KEY_AI_ENABLED, String.valueOf(fp.aiReportEnabled));
@@ -929,9 +986,10 @@ public class FontPreferences {
 		props.setProperty(KEY_AI_TERMINAL_SELECTION_BG, encodeColor(fp.aiTerminalSelectionBg));
 		props.setProperty(KEY_AI_TERMINAL_SELECTION_FG, encodeColor(fp.aiTerminalSelectionFg));
 
-		// Custom cipher map / user risk rules
+		// Custom cipher map / risk rules
 		props.setProperty(KEY_CUSTOM_CIPHER_MAP_ENABLED, String.valueOf(fp.customCipherMapEnabled));
 		props.setProperty(KEY_USER_RISK_RULES_ENABLED, String.valueOf(fp.userRiskRulesEnabled));
+		props.setProperty(KEY_SYSTEM_RISK_RULES_ENABLED, String.valueOf(fp.systemRiskRulesEnabled));
 
 		// Application theme
 		props.setProperty(KEY_APP_THEME_CUSTOM, String.valueOf(fp.appThemeCustom));
@@ -1828,6 +1886,9 @@ public class FontPreferences {
 	public boolean isSectionTlsFingerprint() { return sectionTlsFingerprint; }
 	public void setSectionTlsFingerprint(boolean v) { this.sectionTlsFingerprint = v; }
 
+	public boolean isSectionIncludeMetadata() { return sectionIncludeMetadata; }
+	public void setSectionIncludeMetadata(boolean v) { this.sectionIncludeMetadata = v; }
+
 	public String getCipherConvention() { return cipherConvention; }
 	public void setCipherConvention(String v) { this.cipherConvention = v; }
 
@@ -1863,6 +1924,21 @@ public class FontPreferences {
 	public int getMaxCidrExpansion() { return maxCidrExpansion; }
 	public void setMaxCidrExpansion(int v) { this.maxCidrExpansion = Math.max(1, Math.min(1_000_000, v)); }
 
+	public int getMaxRetries() { return maxRetries; }
+	public void setMaxRetries(int v) { this.maxRetries = Math.max(0, Math.min(10, v)); }
+
+	public long getInitialRetryDelayMs() { return initialRetryDelayMs; }
+	public void setInitialRetryDelayMs(long v) { this.initialRetryDelayMs = Math.max(100, Math.min(10000, v)); }
+
+	public long getMaxRetryDelayMs() { return maxRetryDelayMs; }
+	public void setMaxRetryDelayMs(long v) { this.maxRetryDelayMs = Math.max(100, Math.min(30000, v)); }
+
+	public long getRetryBudgetMs() { return retryBudgetMs; }
+	public void setRetryBudgetMs(long v) { this.retryBudgetMs = Math.max(1000, Math.min(120000, v)); }
+
+	public int getRestorePointInterval() { return restorePointInterval; }
+	public void setRestorePointInterval(int v) { this.restorePointInterval = Math.max(5, Math.min(1000, v)); }
+
 	// ---- scan accessors (delegate to individual for backwards compatibility) ----
 
 	public boolean isScanSectionRiskAssessment() { return sectionRiskAssessment; }
@@ -1885,6 +1961,9 @@ public class FontPreferences {
 
 	public boolean isScanSectionTlsFingerprint() { return sectionTlsFingerprint; }
 	public void setScanSectionTlsFingerprint(boolean v) { this.sectionTlsFingerprint = v; }
+
+	public boolean isScanSectionIncludeMetadata() { return sectionIncludeMetadata; }
+	public void setScanSectionIncludeMetadata(boolean v) { this.sectionIncludeMetadata = v; }
 
 	public String getScanCipherConvention() { return cipherConvention; }
 	public void setScanCipherConvention(String v) { this.cipherConvention = v; }
@@ -2070,6 +2149,9 @@ public class FontPreferences {
 	public boolean isUserRiskRulesEnabled() { return userRiskRulesEnabled; }
 	public void setUserRiskRulesEnabled(boolean v) { this.userRiskRulesEnabled = v; }
 
+	public boolean isSystemRiskRulesEnabled() { return systemRiskRulesEnabled; }
+	public void setSystemRiskRulesEnabled(boolean v) { this.systemRiskRulesEnabled = v; }
+
 	/** @return the file where the custom cipher map YAML is stored */
 	public static File getCustomCipherMapFile() {
 		return new File(new File(new File(getHomeDir(), "ui"), CIPHER_MAP_DIR), CUSTOM_CIPHER_MAP_FILE);
@@ -2175,6 +2257,62 @@ public class FontPreferences {
 			Files.writeString(getUserRiskRulesFile().toPath(), "", StandardCharsets.UTF_8);
 		} catch (IOException e) {
 			logger.error("Failed to clear user risk rules YAML", e);
+		}
+	}
+
+	// ---- system risk rules ----
+
+	/** @return the file where the system risk rules overlay YAML is stored */
+	public static File getSystemRiskRulesFile() {
+		return new File(new File(new File(getHomeDir(), "ui"), RISK_RULES_DIR), SYSTEM_RISK_RULES_FILE);
+	}
+
+	/**
+	 * Load the DeepViolet API's built-in {@code risk-scoring-rules.yaml} from the classpath.
+	 * @return the YAML content, or {@code null} if the resource is not found
+	 */
+	public static String loadApiDefaultRiskRulesYaml() {
+		try (InputStream in = FontPreferences.class.getClassLoader()
+				.getResourceAsStream("risk-scoring-rules.yaml")) {
+			if (in == null) return null;
+			return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			logger.error("Failed to load API default risk rules", e);
+			return null;
+		}
+	}
+
+	/**
+	 * Load the system risk rules overlay YAML from disk.
+	 * Returns null when no overlay file exists yet.
+	 */
+	public static String loadSystemRiskRulesYaml() {
+		File f = getSystemRiskRulesFile();
+		if (!f.exists()) return null;
+		try {
+			return Files.readString(f.toPath(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			logger.error("Failed to load system risk rules overlay YAML", e);
+			return null;
+		}
+	}
+
+	/** Save system risk rules overlay YAML to disk. */
+	public static void saveSystemRiskRulesYaml(String yaml) {
+		File dir = new File(new File(getHomeDir(), "ui"), RISK_RULES_DIR);
+		dir.mkdirs();
+		try {
+			Files.writeString(getSystemRiskRulesFile().toPath(), yaml, StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			logger.error("Failed to save system risk rules overlay YAML", e);
+		}
+	}
+
+	/** Clear the system risk rules overlay by deleting the file. */
+	public static void deleteSystemRiskRulesYaml() {
+		File f = getSystemRiskRulesFile();
+		if (f.exists()) {
+			f.delete();
 		}
 	}
 

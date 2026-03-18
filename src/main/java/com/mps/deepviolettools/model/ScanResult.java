@@ -200,6 +200,28 @@ public class ScanResult {
         return results;
     }
 
+    /**
+     * Returns the set of target URLs that have been scanned (successfully or with error).
+     * Used by scan recovery to determine which targets to skip on resume.
+     */
+    public Set<String> getCompletedTargetUrls() {
+        Set<String> urls = new LinkedHashSet<>();
+        for (HostResult hr : results) {
+            urls.add(hr.getTargetUrl());
+        }
+        return urls;
+    }
+
+    /**
+     * Merges results from a checkpoint into this scan result.
+     * Used by scan recovery to pre-populate results from a previous checkpoint.
+     */
+    public void mergeCheckpoint(ScanResult checkpoint) {
+        for (HostResult hr : checkpoint.getResults()) {
+            results.add(hr);
+        }
+    }
+
     public int getTotalTargets() {
         return totalTargets;
     }
@@ -923,9 +945,9 @@ public class ScanResult {
     }
 
     /**
-     * Builds a TLS fingerprint heat map. Rows are the 10 probe codes plus the
-     * extension hash. Cells compare each host's probe response to the majority
-     * value across all hosts.
+     * Builds a TLS probe fingerprint heat map. Rows are the 10 probe codes.
+     * Cells compare each host's probe response to the majority value across
+     * all hosts.
      *
      * @param nBlocks number of columns (blocks) in the heat map
      * @return populated HeatMapData with MapType.FINGERPRINT
@@ -946,16 +968,16 @@ public class ScanResult {
         int hostsPerBlock = Math.max(1, (totalSuccessful + nBlocks - 1) / nBlocks);
 
         String[] probeDescriptions = {
+            "TLS 1.1 only",
             "TLS 1.2 standard cipher order",
             "TLS 1.2 reverse cipher order",
             "TLS 1.2 with ALPN h2",
             "TLS 1.2 no ECC support",
-            "TLS 1.1 only",
+            "TLS 1.2 forward secrecy only",
             "TLS 1.3 only (TLS 1.3 ciphers)",
             "TLS 1.3 with TLS 1.2 fallback",
             "TLS 1.3 with ALPN h2",
-            "TLS 1.3 reverse cipher order",
-            "TLS 1.2 forward secrecy only"
+            "TLS 1.3 reverse cipher order"
         };
 
         // Parse all fingerprints
@@ -964,19 +986,15 @@ public class ScanResult {
             parsed.add(TlsServerFingerprint.parse(hr.getTlsFingerprint()));
         }
 
-        // 11 rows: Probe 1-10 + Ext Hash
+        // 10 rows: Probe 1-10
         // Extract values for each row across all hosts
-        int totalRows = 11;
+        int totalRows = 10;
         List<String[]> rowValues = new ArrayList<>(); // rowIndex -> host values
         for (int rowIdx = 0; rowIdx < totalRows; rowIdx++) {
             String[] values = new String[totalSuccessful];
             for (int hostIdx = 0; hostIdx < totalSuccessful; hostIdx++) {
                 FingerprintComponents fc = parsed.get(hostIdx);
-                if (rowIdx < 10) {
-                    values[hostIdx] = fc.getProbeCode(rowIdx + 1);
-                } else {
-                    values[hostIdx] = fc.getExtensionHash();
-                }
+                values[hostIdx] = fc.getProbeCode(rowIdx + 1);
             }
             rowValues.add(values);
         }
@@ -999,7 +1017,7 @@ public class ScanResult {
 
                 for (int bi = range[0]; bi <= range[1]; bi++) {
                     HeatMapCell cell = cells[bi];
-                    if (rowIdx < 10 && !fc.probeSucceeded(rowIdx + 1)) {
+                    if (!fc.probeSucceeded(rowIdx + 1)) {
                         cell.addInconclusive();
                     } else if (value != null && value.equals(majorityValue)) {
                         cell.addPass();
@@ -1014,15 +1032,9 @@ public class ScanResult {
             String description;
             String qualifier;
 
-            if (rowIdx < 10) {
-                rowId = "Probe " + (rowIdx + 1);
-                description = "Probe " + (rowIdx + 1);
-                qualifier = probeDescriptions[rowIdx];
-            } else {
-                rowId = "Ext Hash";
-                description = "Extension Hash";
-                qualifier = null;
-            }
+            rowId = "Probe " + (rowIdx + 1);
+            description = "Probe " + (rowIdx + 1);
+            qualifier = probeDescriptions[rowIdx];
 
             rows.add(new HeatMapRow("FINGERPRINT", rowId, description, qualifier, cells));
         }

@@ -237,51 +237,55 @@ public class DeltaResultsPanel extends JPanel {
             return;
         }
 
+        boolean includeMeta = prefs.isSectionIncludeMetadata();
+
         // ---- Universal shared risks (all hosts) ----
-        appendStyled("\n", font, contentColor, false);
-        appendStyled("[Shared Risks]\n", font, headingColor, true);
-
-        // Show base and target scan file paths
-        String basePath = currentResult.getBaseFile() != null
-                ? currentResult.getBaseFile().getAbsolutePath() : "(unknown)";
-        String targetPath = currentResult.getTargetFile() != null
-                ? currentResult.getTargetFile().getAbsolutePath() : "(unknown)";
-        appendSubsection("   Base scan", basePath, "      ",
-                wrap, wrapWidth, font, subsectionColor, contentColor);
-        appendSubsection("   Target scan", targetPath, "      ",
-                wrap, wrapWidth, font, subsectionColor, contentColor);
-
-        List<RiskDelta.DeductionInfo> universal = sharedAnalysis.getUniversalDeductions();
-        if (!universal.isEmpty()) {
-            for (RiskDelta.DeductionInfo di : universal) {
-                Color sevColor = prefs.getColorForSeverity(di.getSeverity());
-                String line = "   " + di.getRuleId() + " [" + di.getSeverity()
-                        + "] " + di.getDescription()
-                        + " (score: " + formatScore(di.getScore()) + ")";
-                appendWrappedLine(line, "      ", wrap, wrapWidth,
-                        font, sevColor, true);
-            }
-        } else {
-            appendWrappedLine("   No risks shared across all hosts.", "      ",
-                    wrap, wrapWidth, font, contentColor, false);
-        }
-
-        // ---- Per-host-group shared risks ----
-        for (SharedRiskAnalysis.SharedRiskGroup group : sharedAnalysis.getHostGroups()) {
+        if (prefs.isSectionRiskAssessment()) {
             appendStyled("\n", font, contentColor, false);
             appendStyled("[Shared Risks]\n", font, headingColor, true);
 
-            Set<String> hostUrls = group.getHostUrls();
-            appendSubsection("   Hosts", String.join(", ", hostUrls), "      ",
+            // Show base and target scan file paths
+            String basePath = currentResult.getBaseFile() != null
+                    ? currentResult.getBaseFile().getAbsolutePath() : "(unknown)";
+            String targetPath = currentResult.getTargetFile() != null
+                    ? currentResult.getTargetFile().getAbsolutePath() : "(unknown)";
+            appendSubsection("   Base scan", basePath, "      ",
+                    wrap, wrapWidth, font, subsectionColor, contentColor);
+            appendSubsection("   Target scan", targetPath, "      ",
                     wrap, wrapWidth, font, subsectionColor, contentColor);
 
-            for (RiskDelta.DeductionInfo di : group.getDeductions()) {
-                Color sevColor = prefs.getColorForSeverity(di.getSeverity());
-                String line = "   " + di.getRuleId() + " [" + di.getSeverity()
-                        + "] " + di.getDescription()
-                        + " (score: " + formatScore(di.getScore()) + ")";
-                appendWrappedLine(line, "      ", wrap, wrapWidth,
-                        font, sevColor, true);
+            List<RiskDelta.DeductionInfo> universal = sharedAnalysis.getUniversalDeductions();
+            if (!universal.isEmpty()) {
+                for (RiskDelta.DeductionInfo di : universal) {
+                    Color sevColor = prefs.getColorForSeverity(di.getSeverity());
+                    String line = "   " + di.getRuleId() + " [" + di.getSeverity()
+                            + "] " + di.getDescription()
+                            + " (score: " + formatScore(di.getScore()) + ")";
+                    appendWrappedLine(line, "      ", wrap, wrapWidth,
+                            font, sevColor, true);
+                }
+            } else {
+                appendWrappedLine("   No risks shared across all hosts.", "      ",
+                        wrap, wrapWidth, font, contentColor, false);
+            }
+
+            // ---- Per-host-group shared risks ----
+            for (SharedRiskAnalysis.SharedRiskGroup group : sharedAnalysis.getHostGroups()) {
+                appendStyled("\n", font, contentColor, false);
+                appendStyled("[Shared Risks]\n", font, headingColor, true);
+
+                Set<String> hostUrls = group.getHostUrls();
+                appendSubsection("   Hosts", String.join(", ", hostUrls), "      ",
+                        wrap, wrapWidth, font, subsectionColor, contentColor);
+
+                for (RiskDelta.DeductionInfo di : group.getDeductions()) {
+                    Color sevColor = prefs.getColorForSeverity(di.getSeverity());
+                    String line = "   " + di.getRuleId() + " [" + di.getSeverity()
+                            + "] " + di.getDescription()
+                            + " (score: " + formatScore(di.getScore()) + ")";
+                    appendWrappedLine(line, "      ", wrap, wrapWidth,
+                            font, sevColor, true);
+                }
             }
         }
 
@@ -300,8 +304,9 @@ public class DeltaResultsPanel extends JPanel {
                                           Color subsectionColor, Color contentColor,
                                           boolean wrap, int wrapWidth) {
         List<HostDelta> hostDeltas = currentResult.getHostDeltas();
+        boolean includeMeta = prefs.isSectionIncludeMetadata();
 
-        // Delta summary
+        // Delta summary (always shown)
         appendStyled("\n", font, contentColor, false);
         appendStyled("[Delta Summary]\n", font, headingColor, true);
         appendWrappedLine("   Changed: " + currentResult.getChangedCount()
@@ -310,28 +315,30 @@ public class DeltaResultsPanel extends JPanel {
                 + "   Unchanged: " + currentResult.getUnchangedCount(),
                 "      ", wrap, wrapWidth, font, contentColor, false);
 
-        // Per-host risk score changes
-        boolean hasRiskChanges = false;
-        for (HostDelta hd : hostDeltas) {
-            if (hd.getRiskDelta() != null && hd.getRiskDelta().hasChanges()) {
-                hasRiskChanges = true;
-                break;
-            }
-        }
-        if (hasRiskChanges) {
-            appendStyled("\n", font, contentColor, false);
-            appendStyled("[Risk Score Changes]\n", font, headingColor, true);
+        // Per-host risk score changes (guarded by risk assessment setting)
+        if (prefs.isSectionRiskAssessment()) {
+            boolean hasRiskChanges = false;
             for (HostDelta hd : hostDeltas) {
-                RiskDelta rd = hd.getRiskDelta();
-                if (rd == null || !rd.hasChanges()) continue;
-                Color dirColor = directionColor(rd.getDirection());
-                String line = "   " + hd.getNormalizedUrl() + ": "
-                        + rd.getBaseGrade() + " (" + rd.getBaseScore() + ") \u2192 "
-                        + rd.getTargetGrade() + " (" + rd.getTargetScore() + ")"
-                        + " [" + (rd.getScoreDiff() >= 0 ? "+" : "")
-                        + rd.getScoreDiff() + "]";
-                appendWrappedLine(line, "      ", wrap, wrapWidth,
-                        font, dirColor, false);
+                if (hd.getRiskDelta() != null && hd.getRiskDelta().hasChanges()) {
+                    hasRiskChanges = true;
+                    break;
+                }
+            }
+            if (hasRiskChanges) {
+                appendStyled("\n", font, contentColor, false);
+                appendStyled("[Risk Score Changes]\n", font, headingColor, true);
+                for (HostDelta hd : hostDeltas) {
+                    RiskDelta rd = hd.getRiskDelta();
+                    if (rd == null || !rd.hasChanges()) continue;
+                    Color dirColor = directionColor(rd.getDirection());
+                    String line = "   " + hd.getNormalizedUrl() + ": "
+                            + rd.getBaseGrade() + " (" + rd.getBaseScore() + ") \u2192 "
+                            + rd.getTargetGrade() + " (" + rd.getTargetScore() + ")"
+                            + " [" + (rd.getScoreDiff() >= 0 ? "+" : "")
+                            + rd.getScoreDiff() + "]";
+                    appendWrappedLine(line, "      ", wrap, wrapWidth,
+                            font, dirColor, false);
+                }
             }
         }
 
@@ -339,25 +346,34 @@ public class DeltaResultsPanel extends JPanel {
         for (HostDelta hd : hostDeltas) {
             if (!hd.hasChanges()) continue;
 
+            boolean hasEnabled = hasEnabledSections(hd);
+            if (!hasEnabled) continue;
+
             appendStyled("\n", font, contentColor, false);
             appendStyled("[" + hd.getNormalizedUrl() + "]\n", font, headingColor, true);
 
+            if (prefs.isSectionRiskAssessment())
+                renderRiskDeductions(hd, font, subsectionColor, contentColor,
+                        wrap, wrapWidth, includeMeta);
             String host = hd.getNormalizedUrl();
-            renderRiskDeductions(hd, font, subsectionColor, contentColor,
-                    wrap, wrapWidth);
-            renderCipherDelta(hd.getCipherDelta(), host, font, subsectionColor,
-                    contentColor, wrap, wrapWidth);
-            renderMapDelta(hd.getSecurityHeadersDelta(), "Security Headers",
-                    host, font, subsectionColor, contentColor, wrap, wrapWidth);
-            renderMapDelta(hd.getConnectionDelta(), "Connection",
-                    host, font, subsectionColor, contentColor, wrap, wrapWidth);
-            renderMapDelta(hd.getHttpHeadersDelta(), "HTTP Headers",
-                    host, font, subsectionColor, contentColor, wrap, wrapWidth);
-            renderFingerprintDelta(hd.getFingerprintDelta(), host, font,
-                    subsectionColor, contentColor, wrap, wrapWidth);
+            if (prefs.isSectionCipherSuites())
+                renderCipherDelta(hd.getCipherDelta(), host, font, subsectionColor,
+                        contentColor, wrap, wrapWidth, includeMeta);
+            if (prefs.isSectionSecurityHeaders())
+                renderMapDelta(hd.getSecurityHeadersDelta(), "Security Headers",
+                        host, font, subsectionColor, contentColor, wrap, wrapWidth, includeMeta);
+            if (prefs.isSectionConnection())
+                renderMapDelta(hd.getConnectionDelta(), "Connection",
+                        host, font, subsectionColor, contentColor, wrap, wrapWidth, includeMeta);
+            if (prefs.isSectionHttpResponse())
+                renderMapDelta(hd.getHttpHeadersDelta(), "HTTP Headers",
+                        host, font, subsectionColor, contentColor, wrap, wrapWidth, includeMeta);
+            if (prefs.isSectionTlsFingerprint())
+                renderFingerprintDelta(hd.getFingerprintDelta(), host, font,
+                        subsectionColor, contentColor, wrap, wrapWidth, includeMeta);
         }
 
-        // Added/removed hosts
+        // Added/removed hosts (always shown)
         List<HostDelta> addedHosts = currentResult.getHostDeltas(
                 HostDelta.HostStatus.ADDED);
         if (!addedHosts.isEmpty()) {
@@ -383,7 +399,8 @@ public class DeltaResultsPanel extends JPanel {
 
     private void renderRiskDeductions(HostDelta hd, Font font,
                                        Color subsectionColor, Color contentColor,
-                                       boolean wrap, int wrapWidth) {
+                                       boolean wrap, int wrapWidth,
+                                       boolean includeMeta) {
         RiskDelta rd = hd.getRiskDelta();
         if (rd == null || !rd.hasChanges()) return;
 
@@ -392,9 +409,11 @@ public class DeltaResultsPanel extends JPanel {
             appendStyled("   Added deductions (" + host + "):\n", font, subsectionColor, true);
             for (RiskDelta.DeductionInfo di : rd.getAddedDeductions()) {
                 Color sevColor = prefs.getColorForSeverity(di.getSeverity());
-                String line = "      " + di.getRuleId() + " [" + di.getSeverity()
-                        + "] " + di.getDescription()
-                        + " (score: " + formatScore(di.getScore()) + ")";
+                String line = "      " + di.getRuleId();
+                if (includeMeta) {
+                    line += " [" + di.getSeverity() + "] " + di.getDescription()
+                            + " (score: " + formatScore(di.getScore()) + ")";
+                }
                 appendWrappedLine(line, "         ", wrap, wrapWidth,
                         font, sevColor, true);
             }
@@ -403,9 +422,11 @@ public class DeltaResultsPanel extends JPanel {
             appendStyled("   Removed deductions (" + host + "):\n", font, subsectionColor, true);
             for (RiskDelta.DeductionInfo di : rd.getRemovedDeductions()) {
                 Color sevColor = prefs.getColorForSeverity(di.getSeverity());
-                String line = "      " + di.getRuleId() + " [" + di.getSeverity()
-                        + "] " + di.getDescription()
-                        + " (score: " + formatScore(di.getScore()) + ")";
+                String line = "      " + di.getRuleId();
+                if (includeMeta) {
+                    line += " [" + di.getSeverity() + "] " + di.getDescription()
+                            + " (score: " + formatScore(di.getScore()) + ")";
+                }
                 appendWrappedLine(line, "         ", wrap, wrapWidth,
                         font, sevColor, true);
             }
@@ -414,19 +435,24 @@ public class DeltaResultsPanel extends JPanel {
 
     private void renderCipherDelta(CipherDelta cd, String host, Font font,
                                     Color subsectionColor, Color contentColor,
-                                    boolean wrap, int wrapWidth) {
+                                    boolean wrap, int wrapWidth,
+                                    boolean includeMeta) {
         if (cd == null || !cd.hasChanges()) return;
 
         appendStyled("   Cipher suite changes (" + host + "):\n", font, subsectionColor, true);
         for (CipherDelta.CipherInfo ci : cd.getAddedCiphers()) {
-            String line = "      + " + ci.getName()
-                    + " (" + ci.getStrength() + ", " + ci.getProtocol() + ")";
+            String line = "      + " + ci.getName();
+            if (includeMeta) {
+                line += " (" + ci.getStrength() + ", " + ci.getProtocol() + ")";
+            }
             appendWrappedLine(line, "         ", wrap, wrapWidth,
                     font, ADDED_COLOR, false);
         }
         for (CipherDelta.CipherInfo ci : cd.getRemovedCiphers()) {
-            String line = "      - " + ci.getName()
-                    + " (" + ci.getStrength() + ", " + ci.getProtocol() + ")";
+            String line = "      - " + ci.getName();
+            if (includeMeta) {
+                line += " (" + ci.getStrength() + ", " + ci.getProtocol() + ")";
+            }
             appendWrappedLine(line, "         ", wrap, wrapWidth,
                     font, REMOVED_COLOR, false);
         }
@@ -434,23 +460,28 @@ public class DeltaResultsPanel extends JPanel {
 
     private void renderMapDelta(MapDelta md, String title, String host,
                                  Font font, Color subsectionColor, Color contentColor,
-                                 boolean wrap, int wrapWidth) {
+                                 boolean wrap, int wrapWidth,
+                                 boolean includeMeta) {
         if (md == null || !md.hasChanges()) return;
 
         appendStyled("   " + title + " changes (" + host + "):\n", font, subsectionColor, true);
         for (Map.Entry<String, String> e : md.getAddedEntries().entrySet()) {
-            String line = "      + " + e.getKey() + ": " + e.getValue();
+            String line = "      + " + e.getKey();
+            if (includeMeta) line += ": " + e.getValue();
             appendWrappedLine(line, "         ", wrap, wrapWidth,
                     font, ADDED_COLOR, false);
         }
         for (Map.Entry<String, String> e : md.getRemovedEntries().entrySet()) {
-            String line = "      - " + e.getKey() + ": " + e.getValue();
+            String line = "      - " + e.getKey();
+            if (includeMeta) line += ": " + e.getValue();
             appendWrappedLine(line, "         ", wrap, wrapWidth,
                     font, REMOVED_COLOR, false);
         }
         for (Map.Entry<String, String[]> e : md.getChangedEntries().entrySet()) {
-            String line = "      ~ " + e.getKey() + ": \"" + e.getValue()[0]
-                    + "\" \u2192 \"" + e.getValue()[1] + "\"";
+            String line = "      ~ " + e.getKey();
+            if (includeMeta) {
+                line += ": \"" + e.getValue()[0] + "\" \u2192 \"" + e.getValue()[1] + "\"";
+            }
             appendWrappedLine(line, "         ", wrap, wrapWidth,
                     font, CHANGED_COLOR, false);
         }
@@ -458,20 +489,40 @@ public class DeltaResultsPanel extends JPanel {
 
     private void renderFingerprintDelta(FingerprintDelta fd, String host,
                                          Font font, Color subsectionColor, Color contentColor,
-                                         boolean wrap, int wrapWidth) {
+                                         boolean wrap, int wrapWidth,
+                                         boolean includeMeta) {
         if (fd == null || !fd.hasChanges()) return;
 
         appendStyled("   Probe Fingerprint changes (" + host + "):\n", font, subsectionColor, true);
-        if (fd.getBaseHash() != null && fd.getTargetHash() != null) {
-            appendWrappedLine("      Hash: " + fd.getBaseHash()
-                    + " \u2192 " + fd.getTargetHash(), "         ",
-                    wrap, wrapWidth, font, CHANGED_COLOR, false);
-        }
         for (FingerprintDelta.ProbeDiff pd : fd.getProbeDiffs()) {
-            appendWrappedLine("      Probe " + pd.getProbeNumber() + ": "
-                    + pd.getBaseCode() + " \u2192 " + pd.getTargetCode(),
-                    "         ", wrap, wrapWidth, font, CHANGED_COLOR, false);
+            String line = "      Probe " + pd.getProbeNumber();
+            if (includeMeta) {
+                line += ": " + pd.getBaseCode() + " \u2192 " + pd.getTargetCode();
+            }
+            appendWrappedLine(line, "         ", wrap, wrapWidth, font, CHANGED_COLOR, false);
         }
+    }
+
+    private boolean hasEnabledSections(HostDelta hd) {
+        if (prefs.isSectionRiskAssessment()
+                && hd.getRiskDelta() != null && hd.getRiskDelta().hasChanges())
+            return true;
+        if (prefs.isSectionCipherSuites()
+                && hd.getCipherDelta() != null && hd.getCipherDelta().hasChanges())
+            return true;
+        if (prefs.isSectionSecurityHeaders()
+                && hd.getSecurityHeadersDelta() != null && hd.getSecurityHeadersDelta().hasChanges())
+            return true;
+        if (prefs.isSectionConnection()
+                && hd.getConnectionDelta() != null && hd.getConnectionDelta().hasChanges())
+            return true;
+        if (prefs.isSectionHttpResponse()
+                && hd.getHttpHeadersDelta() != null && hd.getHttpHeadersDelta().hasChanges())
+            return true;
+        if (prefs.isSectionTlsFingerprint()
+                && hd.getFingerprintDelta() != null && hd.getFingerprintDelta().hasChanges())
+            return true;
+        return false;
     }
 
     private static Color directionColor(DeltaDirection dir) {

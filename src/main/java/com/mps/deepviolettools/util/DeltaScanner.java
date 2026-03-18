@@ -272,20 +272,14 @@ public class DeltaScanner {
      */
     static FingerprintDelta compareFingerprints(String base, String target) {
         if (base == null && target == null) {
-            return new FingerprintDelta(null, null, null, null, null);
+            return new FingerprintDelta(null, null, null);
         }
         if (base == null || target == null) {
-            return new FingerprintDelta(base, target,
-                    base != null ? extractHash(base) : null,
-                    target != null ? extractHash(target) : null,
-                    null);
+            return new FingerprintDelta(base, target, null);
         }
 
         FingerprintComponents baseFp = TlsServerFingerprint.parse(base);
         FingerprintComponents targetFp = TlsServerFingerprint.parse(target);
-
-        String baseHash = baseFp != null ? baseFp.getExtensionHash() : null;
-        String targetHash = targetFp != null ? targetFp.getExtensionHash() : null;
 
         List<FingerprintDelta.ProbeDiff> probeDiffs = new ArrayList<>();
         if (baseFp != null && targetFp != null) {
@@ -299,12 +293,7 @@ public class DeltaScanner {
             }
         }
 
-        return new FingerprintDelta(base, target, baseHash, targetHash, probeDiffs);
-    }
-
-    private static String extractHash(String fingerprint) {
-        FingerprintComponents fp = TlsServerFingerprint.parse(fingerprint);
-        return fp != null ? fp.getExtensionHash() : null;
+        return new FingerprintDelta(base, target, probeDiffs);
     }
 
     /**

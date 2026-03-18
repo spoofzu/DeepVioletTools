@@ -55,6 +55,7 @@ import com.mps.deepviolet.api.ai.AiConfig;
 import com.mps.deepviolet.api.ai.AiProvider;
 import com.mps.deepviolet.api.ai.IAiAnalysisService;
 import com.mps.deepviolettools.util.SctVerifier;
+import com.mps.deepviolet.api.RetryPolicy;
 
 /**
  * Coordinates the order and execution of scan tasks.
@@ -141,6 +142,12 @@ public class UIBackgroundScanTask extends BackgroundTask {
 	/** User risk rules YAML to merge with system rules during risk scoring. */
 	private volatile String userRiskRulesYaml;
 
+	/** System risk rules overlay YAML to replace built-in system rules. */
+	private volatile String systemRiskRulesYaml;
+
+	/** Retry policy for transient network failures. */
+	private volatile RetryPolicy retryPolicy = RetryPolicy.defaults();
+
 	/**
 	 * Set user risk rules YAML to merge with system rules during risk scoring.
 	 *
@@ -148,6 +155,24 @@ public class UIBackgroundScanTask extends BackgroundTask {
 	 */
 	public void setUserRiskRulesYaml(String yaml) {
 		this.userRiskRulesYaml = yaml;
+	}
+
+	/**
+	 * Set system risk rules overlay YAML to replace built-in system rules.
+	 *
+	 * @param yaml the YAML content, or null to use built-in system rules
+	 */
+	public void setSystemRiskRulesYaml(String yaml) {
+		this.systemRiskRulesYaml = yaml;
+	}
+
+	/**
+	 * Set the retry policy for transient network failures.
+	 *
+	 * @param policy the retry policy, or null to disable retries
+	 */
+	public void setRetryPolicy(RetryPolicy policy) {
+		this.retryPolicy = policy != null ? policy : RetryPolicy.disabled();
 	}
 
 	/**
@@ -553,12 +578,33 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			RuleContext ctx = eng.buildRuleContext();
 			this.lastRuleContextMap = ctx.toSerializableMap();
 
+			// Apply system rules overlay via system property if set
+			String previousSysProp = null;
+			boolean sysPropSet = false;
+			if (systemRiskRulesYaml != null && !systemRiskRulesYaml.isBlank()) {
+				java.io.File sysFile = FontPreferences.getSystemRiskRulesFile();
+				if (sysFile.exists()) {
+					previousSysProp = System.getProperty("dv.scoring.rules");
+					System.setProperty("dv.scoring.rules", sysFile.getAbsolutePath());
+					sysPropSet = true;
+				}
+			}
 			IRiskScore score;
-			if (userRiskRulesYaml != null && !userRiskRulesYaml.isBlank()) {
-				score = eng.getRiskScore(ctx, new ByteArrayInputStream(
-						userRiskRulesYaml.getBytes(StandardCharsets.UTF_8)));
-			} else {
-				score = eng.getRiskScore(ctx);
+			try {
+				if (userRiskRulesYaml != null && !userRiskRulesYaml.isBlank()) {
+					score = eng.getRiskScore(ctx, new ByteArrayInputStream(
+							userRiskRulesYaml.getBytes(StandardCharsets.UTF_8)));
+				} else {
+					score = eng.getRiskScore(ctx);
+				}
+			} finally {
+				if (sysPropSet) {
+					if (previousSysProp != null) {
+						System.setProperty("dv.scoring.rules", previousSysProp);
+					} else {
+						System.clearProperty("dv.scoring.rules");
+					}
+				}
 			}
 			this.lastRiskScore = score;
 			int scale = this.riskScale;
@@ -883,7 +929,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 				}
 			}
 
-			ScanNode details = root.addSection("Chain details");
+			ScanNode details = root.addSection("Chain details").setMeta(true);
 
 			int n1 = 0;
 			for (IX509Certificate ldvCert : certs) {
@@ -1208,7 +1254,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		ScanNode certNode = section.addSubsection("[" + label + "] " + rev.getCertSubjectDN());
 
 		// OCSP
-		ScanNode ocsp = certNode.addSubsection("OCSP Check");
+		ScanNode ocsp = certNode.addSubsection("OCSP Check").setMeta(true);
 		if (rev.getOcspStatus() == IRevocationStatus.RevocationResult.NOT_CHECKED) {
 			String msg = "NOT CHECKED";
 			if (rev.getOcspErrorMessage() != null) {
@@ -1260,7 +1306,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		}
 
 		// CRL
-		ScanNode crl = certNode.addSubsection("CRL Check");
+		ScanNode crl = certNode.addSubsection("CRL Check").setMeta(true);
 		if (rev.getCrlStatus() == IRevocationStatus.RevocationResult.NOT_CHECKED) {
 			String msg = "NOT CHECKED";
 			if (rev.getCrlErrorMessage() != null) {
@@ -1294,7 +1340,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		}
 
 		// OneCRL
-		ScanNode oneCrl = certNode.addSubsection("OneCRL Check");
+		ScanNode oneCrl = certNode.addSubsection("OneCRL Check").setMeta(true);
 		if (rev.getOneCrlStatus() == IRevocationStatus.RevocationResult.NOT_CHECKED) {
 			oneCrl.addKeyValue("Status", "NOT CHECKED");
 		} else if (rev.getOneCrlStatus() == IRevocationStatus.RevocationResult.GOOD) {
@@ -1310,7 +1356,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 		}
 
 		// Certificate Transparency SCTs
-		ScanNode scts = certNode.addSubsection("Certificate Transparency (SCTs)");
+		ScanNode scts = certNode.addSubsection("Certificate Transparency (SCTs)").setMeta(true);
 
 		int embedded = rev.getEmbeddedSctCount();
 		int tlsExt = rev.getTlsExtensionSctCount();
@@ -1428,13 +1474,13 @@ public class UIBackgroundScanTask extends BackgroundTask {
 	}
 
 	/**
-	 * Build TLS server fingerprint for the target host.
-	 * Probe codes and the extension hash are rendered as colon-delimited
-	 * hex octets.  Failed probes are represented as 00:00:00.
+	 * Build TLS probe fingerprint for the target host.
+	 * Probe codes are rendered as colon-delimited hex octets.
+	 * Failed probes are represented as 00:00:00.
 	 */
 	public void buildTlsFingerprint() {
 
-		ScanNode section = root.addSection("TLS server fingerprint");
+		ScanNode section = root.addSection("TLS Probe Fingerprint");
 
 		try {
 			String fingerprint = eng.getTlsFingerprint();
@@ -1459,19 +1505,19 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			// Parse components for detailed view
 			TlsServerFingerprint.FingerprintComponents components = TlsServerFingerprint.parse(fingerprint);
 			if (components != null) {
-				ScanNode agg = section.addSubsection("Fingerprint Aggregation");
+				ScanNode agg = section.addSubsection("Fingerprint Aggregation").setMeta(true);
 
 				String[] probeDescriptions = {
+					"TLS 1.1 only",
 					"TLS 1.2 standard cipher order",
 					"TLS 1.2 reverse cipher order",
 					"TLS 1.2 with ALPN h2",
 					"TLS 1.2 no ECC support",
-					"TLS 1.1 only",
+					"TLS 1.2 forward secrecy only",
 					"TLS 1.3 only (TLS 1.3 ciphers)",
 					"TLS 1.3 with TLS 1.2 fallback",
 					"TLS 1.3 with ALPN h2",
-					"TLS 1.3 reverse cipher order",
-					"TLS 1.2 forward secrecy only"
+					"TLS 1.3 reverse cipher order"
 				};
 
 				for (int i = 1; i <= 10; i++) {
@@ -1482,7 +1528,6 @@ public class UIBackgroundScanTask extends BackgroundTask {
 							probeCodeToOctets(code) + " (" + status + ") " + probeDescriptions[i - 1]);
 				}
 
-				agg.addKeyValue("Extension Hash", hexToOctets(components.getExtensionHash()));
 			}
 
 		} catch (Exception e) {
@@ -1528,16 +1573,15 @@ public class UIBackgroundScanTask extends BackgroundTask {
 	}
 
 	/**
-	 * Convert a full 62-character fingerprint string to colon-delimited
-	 * hex octets.  The first 30 characters (10 x 3-char probe codes) are
-	 * each converted via {@link #probeCodeToOctets}; the remaining 32
-	 * characters (extension hash hex) are converted via {@link #hexToOctets}.
+	 * Convert a 30-character probe fingerprint string to colon-delimited
+	 * hex octets.  The 30 characters (10 x 3-char probe codes) are
+	 * each converted via {@link #probeCodeToOctets}.
 	 *
-	 * @param fingerprint 62-character raw fingerprint
+	 * @param fingerprint 30-character raw probe fingerprint
 	 * @return colon-delimited hex octets for the entire fingerprint
 	 */
 	private static String fingerprintToOctets(String fingerprint) {
-		if (fingerprint == null || fingerprint.length() != 62) {
+		if (fingerprint == null || fingerprint.length() != 30) {
 			return fingerprint != null ? fingerprint : "";
 		}
 		StringBuilder sb = new StringBuilder();
@@ -1547,10 +1591,6 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			String code = fingerprint.substring(p * 3, p * 3 + 3);
 			sb.append(probeCodeToOctets(code));
 		}
-		// Extension hash (32 hex chars → 16 octets)
-		String hash = fingerprint.substring(30);
-		sb.append(':');
-		sb.append(hexToOctets(hash));
 		return sb.toString();
 	}
 
@@ -1670,13 +1710,17 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			// with untrusted certificates (self-signed, expired, etc.)
 			installTrustAllSslContext();
 
-			// Initialize the DV libraries (network).
+			// Initialize the DV libraries (network) with retry for transient failures.
 			setStatusBarMessage("Starting scan");
 			long t0 = System.currentTimeMillis();
-			this.session = DeepVioletFactory.initializeSession(url);
-			eng = DeepVioletFactory.getEngine(session, cipherConvention, this, buildEnabledProtocols());
-			dvCert = eng.getCertificate();
-			dvHosts = session.getHostInterfaces();
+			retryPolicy.execute(() -> {
+				this.session = DeepVioletFactory.initializeSession(url);
+				eng = DeepVioletFactory.getEngine(session, cipherConvention,
+						UIBackgroundScanTask.this, buildEnabledProtocols());
+				dvCert = eng.getCertificate();
+				dvHosts = session.getHostInterfaces();
+				return null;
+			}, this);
 			networkTimings.put("Session init", System.currentTimeMillis() - t0);
 
 			// All sections are always built so saved results contain full metadata.
@@ -1720,7 +1764,7 @@ public class UIBackgroundScanTask extends BackgroundTask {
 			checkRevocationErrors();
 
 			// TLS server fingerprint (network)
-			if (!runSection("TLS fingerprint", networkTimings, "TLS server fingerprint", this::buildTlsFingerprint)) return;
+			if (!runSection("TLS fingerprint", networkTimings, "TLS Probe Fingerprint", this::buildTlsFingerprint)) return;
 			checkFingerprintInconclusive();
 
 		} catch (Exception e) {

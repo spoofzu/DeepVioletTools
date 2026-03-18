@@ -47,3 +47,6 @@ replay_pid*
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Serena
+.serena/

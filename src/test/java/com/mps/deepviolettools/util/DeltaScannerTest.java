@@ -264,18 +264,20 @@ class DeltaScannerTest {
 
     @Test
     void compareFingerprints_identical_noChanges() {
-        // 62-char fingerprint: 30 chars probe codes + 32 chars hash
-        String fp = "abcabcabcabcabcabcabcabcabcabc" + "a" + "0123456789abcdef0123456789abcdef";
+        // 30-char probe fingerprint: 10 x 3-char probe codes
+        String fp = "abcabcabcabcabcabcabcabcabcabc";
         FingerprintDelta delta = DeltaScanner.compareFingerprints(fp, fp);
         assertFalse(delta.hasChanges());
     }
 
     @Test
-    void compareFingerprints_differentHash_hasChanges() {
-        String fp1 = "abcabcabcabcabcabcabcabcabcabc" + "a" + "0123456789abcdef0123456789abcdef";
-        String fp2 = "abcabcabcabcabcabcabcabcabcabc" + "a" + "fedcba9876543210fedcba9876543210";
+    void compareFingerprints_differentProbe_hasChanges() {
+        String fp1 = "abcabcabcabcabcabcabcabcabcabc";
+        String fp2 = "xyzabcabcabcabcabcabcabcabcabc";
         FingerprintDelta delta = DeltaScanner.compareFingerprints(fp1, fp2);
         assertTrue(delta.hasChanges());
+        assertEquals(1, delta.getProbeDiffs().size());
+        assertEquals(1, delta.getProbeDiffs().get(0).getProbeNumber());
     }
 
     @Test

@@ -328,8 +328,10 @@ public class ReportExporter {
 
 			boolean wrap = prefs.isHardwrapEnabled();
 			int wrapWidth = prefs.getHardwrapWidth();
+			boolean includeMeta = prefs.isSectionIncludeMetadata();
 
 			root.walkVisible(node -> {
+				if (!includeMeta && node.isEffectivelyMeta()) return;
 				String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 				switch (node.getType()) {
 					case NOTICE:
@@ -417,9 +419,11 @@ public class ReportExporter {
 			int targetChars = wrap ? wrapWidth : 120;
 			final float fontSize = Math.max(availableWidth / (targetChars * 0.6f), 6f);
 			final float leading = fontSize * 1.15f;
+			boolean includeMeta = prefs.isSectionIncludeMetadata();
 
 			root.walkVisible(node -> {
 				try {
+					if (!includeMeta && node.isEffectivelyMeta()) return;
 					String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 					switch (node.getType()) {
 						case NOTICE:
@@ -1152,7 +1156,7 @@ public class ReportExporter {
 			maps.add(result.toRevocationHeatMap(nBlocks));
 		}
 		if (prefs.isScanSectionTlsFingerprint()) {
-			titles.add("TLS Fingerprint");
+			titles.add("TLS Probe Fingerprint");
 			maps.add(result.toFingerprintHeatMap(nBlocks));
 		}
 	}
@@ -1199,7 +1203,7 @@ public class ReportExporter {
 			writeHtmlHeatMap(p, "Connection Characteristics", result.toConnectionHeatMap(nBlocks), passColor, failColor, incColor);
 			writeHtmlHeatMap(p, "Cipher Suites", result.toCipherHeatMap(nBlocks), passColor, failColor, incColor);
 			writeHtmlHeatMap(p, "Revocation Status", result.toRevocationHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "TLS Fingerprint", result.toFingerprintHeatMap(nBlocks), passColor, failColor, incColor);
+			writeHtmlHeatMap(p, "TLS Probe Fingerprint", result.toFingerprintHeatMap(nBlocks), passColor, failColor, incColor);
 
 			// Error summary
 			boolean hasErrors = false;
@@ -1410,7 +1414,13 @@ public class ReportExporter {
 	 */
 	private static void writeHtmlTreeNodes(PrintWriter p, ScanNode root,
 			boolean wrap, int wrapWidth) {
+		writeHtmlTreeNodes(p, root, wrap, wrapWidth, true);
+	}
+
+	private static void writeHtmlTreeNodes(PrintWriter p, ScanNode root,
+			boolean wrap, int wrapWidth, boolean includeMeta) {
 		root.walkVisible(node -> {
+			if (!includeMeta && node.isEffectivelyMeta()) return;
 			String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 			switch (node.getType()) {
 				case NOTICE:
@@ -1551,8 +1561,10 @@ public class ReportExporter {
 	private static void writePdfTreeNodes(com.lowagie.text.Document pdfDoc, ScanNode root,
 			boolean wrap, int wrapWidth, float fontSize, float leading,
 			FontPreferences prefs) {
+		boolean includeMeta = prefs.isSectionIncludeMetadata();
 		root.walkVisible(node -> {
 			try {
+				if (!includeMeta && node.isEffectivelyMeta()) return;
 				String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 				switch (node.getType()) {
 					case NOTICE:
@@ -1867,7 +1879,7 @@ public class ReportExporter {
 			String[] titles = {
 				"TLS Risk Assessment", "Security Headers Analysis",
 				"HTTP Response Headers", "Connection Characteristics", "Cipher Suites",
-				"Revocation Status", "TLS Fingerprint"
+				"Revocation Status", "TLS Probe Fingerprint"
 			};
 			com.mps.deepviolettools.model.HeatMapData[] maps = {
 				result.toRiskHeatMap(nBlocks),
@@ -2358,11 +2370,14 @@ public class ReportExporter {
 	 */
 	public static String deltaToPlainText(DeltaScanResult result) {
 		FontPreferences prefs = FontPreferences.load();
+		boolean includeMeta = prefs.isSectionIncludeMetadata();
 		StringBuilder sb = new StringBuilder();
 		sb.append(buildDeltaBanner(result));
 
-		// Shared risks (always shown, matches on-screen rendering)
-		appendSharedRisksText(sb, result);
+		// Shared risks (guarded by risk assessment setting)
+		if (prefs.isSectionRiskAssessment()) {
+			appendSharedRisksText(sb, result);
+		}
 
 		// Workbench-only sections: detailed per-host deltas
 		if (prefs.isWorkbenchMode()) {
@@ -2391,34 +2406,31 @@ public class ReportExporter {
 				sb.append('\n');
 			}
 
-			int nBlocks = 20;
-			com.mps.deepviolettools.model.HeatMapData overview =
-					DeltaHeatMapBuilder.buildOverviewHeatMap(result, nBlocks);
-			if (!overview.getRows().isEmpty()) {
-				sb.append("[Delta Heat Map]\n");
-				sb.append(heatMapToText(overview));
-				List<HostDelta> changedHosts = result.getHostDeltas(
-						HostDelta.HostStatus.CHANGED);
-				sb.append(DeltaHeatMapBuilder.deltaLegendText(
-						changedHosts.size(), nBlocks));
-				sb.append('\n');
-				sb.append('\n');
-			}
-
 			List<HostDelta> changed = result.getHostDeltas(HostDelta.HostStatus.CHANGED);
 			if (!changed.isEmpty()) {
 				sb.append("[Changed Hosts]\n\n");
 				for (HostDelta hd : changed) {
+					StringBuilder hostText = new StringBuilder();
 					String host = hd.getNormalizedUrl();
-					sb.append("   --- ").append(host)
-					  .append(" (").append(hd.getOverallDirection().name())
-					  .append(") ---\n\n");
-					appendRiskDeltaText(sb, hd.getRiskDelta(), host);
-					appendCipherDeltaText(sb, hd.getCipherDelta(), host);
-					appendMapDeltaText(sb, hd.getSecurityHeadersDelta(), host);
-					appendMapDeltaText(sb, hd.getConnectionDelta(), host);
-					appendMapDeltaText(sb, hd.getHttpHeadersDelta(), host);
-					appendFingerprintDeltaText(sb, hd.getFingerprintDelta(), host);
+					if (prefs.isSectionRiskAssessment())
+						appendRiskDeltaText(hostText, hd.getRiskDelta(), host, includeMeta);
+					if (prefs.isSectionCipherSuites())
+						appendCipherDeltaText(hostText, hd.getCipherDelta(), host, includeMeta);
+					if (prefs.isSectionSecurityHeaders())
+						appendMapDeltaText(hostText, hd.getSecurityHeadersDelta(), host, includeMeta);
+					if (prefs.isSectionConnection())
+						appendMapDeltaText(hostText, hd.getConnectionDelta(), host, includeMeta);
+					if (prefs.isSectionHttpResponse())
+						appendMapDeltaText(hostText, hd.getHttpHeadersDelta(), host, includeMeta);
+					if (prefs.isSectionTlsFingerprint())
+						appendFingerprintDeltaText(hostText, hd.getFingerprintDelta(), host, includeMeta);
+
+					if (hostText.length() > 0) {
+						sb.append("   --- ").append(hd.getNormalizedUrl())
+						  .append(" (").append(hd.getOverallDirection().name())
+						  .append(") ---\n\n");
+						sb.append(hostText);
+					}
 				}
 			}
 		}
@@ -2488,57 +2500,71 @@ public class ReportExporter {
 	}
 
 	private static void appendRiskDeltaText(StringBuilder sb, RiskDelta delta,
-			String host) {
+			String host, boolean includeMeta) {
 		sb.append("   [TLS Risk Assessment (").append(host).append(")]\n");
 		if (delta == null || !delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
 		}
-		sb.append("      Score: ").append(delta.getBaseScore())
-		  .append(" \u2192 ").append(delta.getTargetScore());
-		if (delta.getScoreDiff() != 0) {
-			sb.append(" (").append(delta.getScoreDiff() > 0 ? "+" : "")
-			  .append(delta.getScoreDiff()).append(')');
+		if (includeMeta) {
+			sb.append("      Score: ").append(delta.getBaseScore())
+			  .append(" \u2192 ").append(delta.getTargetScore());
+			if (delta.getScoreDiff() != 0) {
+				sb.append(" (").append(delta.getScoreDiff() > 0 ? "+" : "")
+				  .append(delta.getScoreDiff()).append(')');
+			}
+			sb.append('\n');
+			sb.append("      Grade: ").append(delta.getBaseGrade())
+			  .append(" \u2192 ").append(delta.getTargetGrade()).append('\n');
 		}
-		sb.append('\n');
-		sb.append("      Grade: ").append(delta.getBaseGrade())
-		  .append(" \u2192 ").append(delta.getTargetGrade()).append('\n');
 		for (RiskDelta.DeductionInfo d : delta.getAddedDeductions()) {
-			sb.append("      + ").append(d.getRuleId()).append(' ')
-			  .append(d.getDescription())
-			  .append(" (").append(d.getSeverity())
-			  .append(", score=").append(d.getScore()).append(")\n");
+			sb.append("      + ").append(d.getRuleId());
+			if (includeMeta) {
+				sb.append(' ').append(d.getDescription())
+				  .append(" (").append(d.getSeverity())
+				  .append(", score=").append(d.getScore()).append(")");
+			}
+			sb.append('\n');
 		}
 		for (RiskDelta.DeductionInfo d : delta.getRemovedDeductions()) {
-			sb.append("      - ").append(d.getRuleId()).append(' ')
-			  .append(d.getDescription())
-			  .append(" (was score=").append(d.getScore()).append(")\n");
+			sb.append("      - ").append(d.getRuleId());
+			if (includeMeta) {
+				sb.append(' ').append(d.getDescription())
+				  .append(" (was score=").append(d.getScore()).append(")");
+			}
+			sb.append('\n');
 		}
 		sb.append('\n');
 	}
 
 	private static void appendCipherDeltaText(StringBuilder sb, CipherDelta delta,
-			String host) {
+			String host, boolean includeMeta) {
 		sb.append("   [Server cipher suites (").append(host).append(")]\n");
 		if (delta == null || !delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
 		}
 		for (CipherDelta.CipherInfo c : delta.getAddedCiphers()) {
-			sb.append("      + ").append(c.getName())
-			  .append(" (").append(c.getStrength())
-			  .append(", ").append(c.getProtocol()).append(")\n");
+			sb.append("      + ").append(c.getName());
+			if (includeMeta) {
+				sb.append(" (").append(c.getStrength())
+				  .append(", ").append(c.getProtocol()).append(")");
+			}
+			sb.append('\n');
 		}
 		for (CipherDelta.CipherInfo c : delta.getRemovedCiphers()) {
-			sb.append("      - ").append(c.getName())
-			  .append(" (").append(c.getStrength())
-			  .append(", ").append(c.getProtocol()).append(")\n");
+			sb.append("      - ").append(c.getName());
+			if (includeMeta) {
+				sb.append(" (").append(c.getStrength())
+				  .append(", ").append(c.getProtocol()).append(")");
+			}
+			sb.append('\n');
 		}
 		sb.append('\n');
 	}
 
 	private static void appendMapDeltaText(StringBuilder sb, MapDelta delta,
-			String host) {
+			String host, boolean includeMeta) {
 		if (delta == null) return;
 		sb.append("   [").append(delta.getSectionName()).append(" (").append(host).append(")]\n");
 		if (!delta.hasChanges()) {
@@ -2546,36 +2572,40 @@ public class ReportExporter {
 			return;
 		}
 		for (Map.Entry<String, String> e : delta.getAddedEntries().entrySet()) {
-			sb.append("      + ").append(e.getKey()).append(": ")
-			  .append(e.getValue()).append('\n');
+			sb.append("      + ").append(e.getKey());
+			if (includeMeta) sb.append(": ").append(e.getValue());
+			sb.append('\n');
 		}
 		for (Map.Entry<String, String[]> e : delta.getChangedEntries().entrySet()) {
-			sb.append("      ~ ").append(e.getKey()).append(": \"")
-			  .append(e.getValue()[0]).append("\" \u2192 \"")
-			  .append(e.getValue()[1]).append("\"\n");
+			sb.append("      ~ ").append(e.getKey());
+			if (includeMeta) {
+				sb.append(": \"").append(e.getValue()[0])
+				  .append("\" \u2192 \"").append(e.getValue()[1]).append("\"");
+			}
+			sb.append('\n');
 		}
 		for (Map.Entry<String, String> e : delta.getRemovedEntries().entrySet()) {
-			sb.append("      - ").append(e.getKey()).append(": ")
-			  .append(e.getValue()).append('\n');
+			sb.append("      - ").append(e.getKey());
+			if (includeMeta) sb.append(": ").append(e.getValue());
+			sb.append('\n');
 		}
 		sb.append('\n');
 	}
 
 	private static void appendFingerprintDeltaText(StringBuilder sb,
-			FingerprintDelta delta, String host) {
+			FingerprintDelta delta, String host, boolean includeMeta) {
 		sb.append("   [TLS Probe Fingerprint (").append(host).append(")]\n");
 		if (delta == null || !delta.hasChanges()) {
 			sb.append("      Status=No changes\n\n");
 			return;
 		}
-		if (delta.getBaseHash() != null && delta.getTargetHash() != null) {
-			sb.append("      Hash: ").append(delta.getBaseHash())
-			  .append(" \u2192 ").append(delta.getTargetHash()).append('\n');
-		}
 		for (FingerprintDelta.ProbeDiff pd : delta.getProbeDiffs()) {
-			sb.append("      ~ Probe ").append(pd.getProbeNumber())
-			  .append(": ").append(pd.getBaseCode())
-			  .append(" \u2192 ").append(pd.getTargetCode()).append('\n');
+			sb.append("      ~ Probe ").append(pd.getProbeNumber());
+			if (includeMeta) {
+				sb.append(": ").append(pd.getBaseCode())
+				  .append(" \u2192 ").append(pd.getTargetCode());
+			}
+			sb.append('\n');
 		}
 		sb.append('\n');
 	}
@@ -2606,6 +2636,7 @@ public class ReportExporter {
 	 */
 	static String deltaToJsonString(DeltaScanResult result, Gson gson) {
 		FontPreferences prefs = FontPreferences.load();
+		boolean includeMeta = prefs.isSectionIncludeMetadata();
 		Map<String, Object> jsonMap = new LinkedHashMap<>();
 		jsonMap.put("report_type", "delta");
 		jsonMap.put("comparison_date", result.getComparisonDate().toString());
@@ -2616,40 +2647,42 @@ public class ReportExporter {
 		jsonMap.put("base_host_count", result.getBaseHostCount());
 		jsonMap.put("target_host_count", result.getTargetHostCount());
 
-		// Shared risks (always included, matches on-screen rendering)
-		SharedRiskAnalysis analysis = SharedRiskAnalysis.analyze(result);
-		Map<String, Object> sharedRisks = new LinkedHashMap<>();
-		sharedRisks.put("total_host_count", analysis.getTotalHostCount());
+		// Shared risks (guarded by risk assessment setting)
+		if (prefs.isSectionRiskAssessment()) {
+			SharedRiskAnalysis analysis = SharedRiskAnalysis.analyze(result);
+			Map<String, Object> sharedRisks = new LinkedHashMap<>();
+			sharedRisks.put("total_host_count", analysis.getTotalHostCount());
 
-		List<Map<String, Object>> universalList = new ArrayList<>();
-		for (RiskDelta.DeductionInfo di : analysis.getUniversalDeductions()) {
-			Map<String, Object> d = new LinkedHashMap<>();
-			d.put("rule_id", di.getRuleId());
-			d.put("severity", di.getSeverity());
-			d.put("description", di.getDescription());
-			d.put("score", di.getScore());
-			universalList.add(d);
-		}
-		sharedRisks.put("universal", universalList);
-
-		List<Map<String, Object>> groupsList = new ArrayList<>();
-		for (SharedRiskAnalysis.SharedRiskGroup group : analysis.getHostGroups()) {
-			Map<String, Object> g = new LinkedHashMap<>();
-			g.put("hosts", new ArrayList<>(group.getHostUrls()));
-			List<Map<String, Object>> groupDeds = new ArrayList<>();
-			for (RiskDelta.DeductionInfo di : group.getDeductions()) {
+			List<Map<String, Object>> universalList = new ArrayList<>();
+			for (RiskDelta.DeductionInfo di : analysis.getUniversalDeductions()) {
 				Map<String, Object> d = new LinkedHashMap<>();
 				d.put("rule_id", di.getRuleId());
 				d.put("severity", di.getSeverity());
 				d.put("description", di.getDescription());
 				d.put("score", di.getScore());
-				groupDeds.add(d);
+				universalList.add(d);
 			}
-			g.put("deductions", groupDeds);
-			groupsList.add(g);
+			sharedRisks.put("universal", universalList);
+
+			List<Map<String, Object>> groupsList = new ArrayList<>();
+			for (SharedRiskAnalysis.SharedRiskGroup group : analysis.getHostGroups()) {
+				Map<String, Object> g = new LinkedHashMap<>();
+				g.put("hosts", new ArrayList<>(group.getHostUrls()));
+				List<Map<String, Object>> groupDeds = new ArrayList<>();
+				for (RiskDelta.DeductionInfo di : group.getDeductions()) {
+					Map<String, Object> d = new LinkedHashMap<>();
+					d.put("rule_id", di.getRuleId());
+					d.put("severity", di.getSeverity());
+					d.put("description", di.getDescription());
+					d.put("score", di.getScore());
+					groupDeds.add(d);
+				}
+				g.put("deductions", groupDeds);
+				groupsList.add(g);
+			}
+			sharedRisks.put("host_groups", groupsList);
+			jsonMap.put("shared_risks", sharedRisks);
 		}
-		sharedRisks.put("host_groups", groupsList);
-		jsonMap.put("shared_risks", sharedRisks);
 
 		// Workbench-only sections: summary counts and per-host delta details
 		if (prefs.isWorkbenchMode()) {
@@ -2667,16 +2700,20 @@ public class ReportExporter {
 				hostMap.put("status", hd.getStatus().name());
 				hostMap.put("direction", hd.getOverallDirection().name());
 
-				if (hd.getRiskDelta() != null && hd.getRiskDelta().hasChanges()) {
+				if (prefs.isSectionRiskAssessment()
+						&& hd.getRiskDelta() != null && hd.getRiskDelta().hasChanges()) {
 					Map<String, Object> risk = new LinkedHashMap<>();
 					risk.put("base_score", hd.getRiskDelta().getBaseScore());
 					risk.put("target_score", hd.getRiskDelta().getTargetScore());
 					risk.put("score_diff", hd.getRiskDelta().getScoreDiff());
-					risk.put("base_grade", hd.getRiskDelta().getBaseGrade());
-					risk.put("target_grade", hd.getRiskDelta().getTargetGrade());
+					if (includeMeta) {
+						risk.put("base_grade", hd.getRiskDelta().getBaseGrade());
+						risk.put("target_grade", hd.getRiskDelta().getTargetGrade());
+					}
 					hostMap.put("risk_delta", risk);
 				}
-				if (hd.getCipherDelta() != null && hd.getCipherDelta().hasChanges()) {
+				if (prefs.isSectionCipherSuites()
+						&& hd.getCipherDelta() != null && hd.getCipherDelta().hasChanges()) {
 					Map<String, Object> cipher = new LinkedHashMap<>();
 					List<String> ca = new ArrayList<>();
 					for (CipherDelta.CipherInfo c : hd.getCipherDelta().getAddedCiphers())
@@ -2688,14 +2725,24 @@ public class ReportExporter {
 					cipher.put("removed", cr);
 					hostMap.put("cipher_delta", cipher);
 				}
-				addMapDeltaJson(hostMap, "security_headers_delta", hd.getSecurityHeadersDelta());
-				addMapDeltaJson(hostMap, "connection_delta", hd.getConnectionDelta());
-				addMapDeltaJson(hostMap, "http_headers_delta", hd.getHttpHeadersDelta());
-				if (hd.getFingerprintDelta() != null && hd.getFingerprintDelta().hasChanges()) {
+				if (prefs.isSectionSecurityHeaders())
+					addMapDeltaJson(hostMap, "security_headers_delta",
+							hd.getSecurityHeadersDelta(), includeMeta);
+				if (prefs.isSectionConnection())
+					addMapDeltaJson(hostMap, "connection_delta",
+							hd.getConnectionDelta(), includeMeta);
+				if (prefs.isSectionHttpResponse())
+					addMapDeltaJson(hostMap, "http_headers_delta",
+							hd.getHttpHeadersDelta(), includeMeta);
+				if (prefs.isSectionTlsFingerprint()
+						&& hd.getFingerprintDelta() != null
+						&& hd.getFingerprintDelta().hasChanges()) {
 					Map<String, Object> fp = new LinkedHashMap<>();
 					fp.put("base", hd.getFingerprintDelta().getBaseFingerprint());
 					fp.put("target", hd.getFingerprintDelta().getTargetFingerprint());
-					fp.put("probe_diffs", hd.getFingerprintDelta().getProbeDiffs().size());
+					if (includeMeta) {
+						fp.put("probe_diffs", hd.getFingerprintDelta().getProbeDiffs().size());
+					}
 					hostMap.put("fingerprint_delta", fp);
 				}
 
@@ -2708,16 +2755,22 @@ public class ReportExporter {
 	}
 
 	private static void addMapDeltaJson(Map<String, Object> hostMap,
-			String key, MapDelta delta) {
+			String key, MapDelta delta, boolean includeMeta) {
 		if (delta == null || !delta.hasChanges()) return;
 		Map<String, Object> m = new LinkedHashMap<>();
-		m.put("added", delta.getAddedEntries());
-		m.put("removed", delta.getRemovedEntries());
-		Map<String, String> changed = new LinkedHashMap<>();
-		for (Map.Entry<String, String[]> e : delta.getChangedEntries().entrySet()) {
-			changed.put(e.getKey(), e.getValue()[0] + " -> " + e.getValue()[1]);
+		if (includeMeta) {
+			m.put("added", delta.getAddedEntries());
+			m.put("removed", delta.getRemovedEntries());
+			Map<String, String> changed = new LinkedHashMap<>();
+			for (Map.Entry<String, String[]> e : delta.getChangedEntries().entrySet()) {
+				changed.put(e.getKey(), e.getValue()[0] + " -> " + e.getValue()[1]);
+			}
+			m.put("changed", changed);
+		} else {
+			m.put("added", new ArrayList<>(delta.getAddedEntries().keySet()));
+			m.put("removed", new ArrayList<>(delta.getRemovedEntries().keySet()));
+			m.put("changed", new ArrayList<>(delta.getChangedEntries().keySet()));
 		}
-		m.put("changed", changed);
 		hostMap.put(key, m);
 	}
 
@@ -2746,8 +2799,12 @@ public class ReportExporter {
 			writeHtmlBanner(p, "DeepViolet Delta Scan Report",
 					toHtmlColor(prefs.getNotice()));
 
-			// Shared risks (always shown, matches on-screen rendering)
-			writeHtmlSharedRisks(p, result, prefs);
+			boolean includeMeta = prefs.isSectionIncludeMetadata();
+
+			// Shared risks (guarded by risk assessment setting)
+			if (prefs.isSectionRiskAssessment()) {
+				writeHtmlSharedRisks(p, result, prefs);
+			}
 
 			// Workbench-only sections: detailed per-host deltas
 			if (prefs.isWorkbenchMode()) {
@@ -2779,11 +2836,13 @@ public class ReportExporter {
 					p.println("<span class=\"section\">[Changed Hosts]</span>");
 					p.println();
 					for (HostDelta hd : changed) {
-						p.println("<span class=\"section\">   --- "
-								+ escapeHtml(hd.getNormalizedUrl()) + " ("
-								+ hd.getOverallDirection().name() + ") ---</span>");
-						p.println();
-						writeHtmlDeltaSections(p, hd);
+						if (hasEnabledSections(hd, prefs)) {
+							p.println("<span class=\"section\">   --- "
+									+ escapeHtml(hd.getNormalizedUrl()) + " ("
+									+ hd.getOverallDirection().name() + ") ---</span>");
+							p.println();
+							writeHtmlDeltaSections(p, hd, prefs, includeMeta);
+						}
 					}
 				}
 			}
@@ -2842,59 +2901,80 @@ public class ReportExporter {
 		}
 	}
 
-	private static void writeHtmlDeltaSections(PrintWriter p, HostDelta hd) {
+	private static void writeHtmlDeltaSections(PrintWriter p, HostDelta hd,
+			FontPreferences prefs, boolean includeMeta) {
 		String host = hd.getNormalizedUrl();
-		writeHtmlRiskDelta(p, hd.getRiskDelta(), host);
-		writeHtmlCipherDelta(p, hd.getCipherDelta(), host);
-		writeHtmlMapDelta(p, hd.getSecurityHeadersDelta(), host);
-		writeHtmlMapDelta(p, hd.getConnectionDelta(), host);
-		writeHtmlMapDelta(p, hd.getHttpHeadersDelta(), host);
-		writeHtmlFingerprintDelta(p, hd.getFingerprintDelta(), host);
+		if (prefs.isSectionRiskAssessment())
+			writeHtmlRiskDelta(p, hd.getRiskDelta(), host, includeMeta);
+		if (prefs.isSectionCipherSuites())
+			writeHtmlCipherDelta(p, hd.getCipherDelta(), host, includeMeta);
+		if (prefs.isSectionSecurityHeaders())
+			writeHtmlMapDelta(p, hd.getSecurityHeadersDelta(), host, includeMeta);
+		if (prefs.isSectionConnection())
+			writeHtmlMapDelta(p, hd.getConnectionDelta(), host, includeMeta);
+		if (prefs.isSectionHttpResponse())
+			writeHtmlMapDelta(p, hd.getHttpHeadersDelta(), host, includeMeta);
+		if (prefs.isSectionTlsFingerprint())
+			writeHtmlFingerprintDelta(p, hd.getFingerprintDelta(), host, includeMeta);
 	}
 
 	private static void writeHtmlRiskDelta(PrintWriter p, RiskDelta delta,
-			String host) {
+			String host, boolean includeMeta) {
 		p.println("   <span class=\"section\">[TLS Risk Assessment (" + escapeHtml(host) + ")]</span>");
 		if (delta == null || !delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
 			return;
 		}
-		String scoreDir = delta.getScoreDiff() > 0 ? "added" : delta.getScoreDiff() < 0 ? "removed" : "changed";
-		p.println("      <span class=\"" + scoreDir + "\">Score: " + delta.getBaseScore()
-				+ " \u2192 " + delta.getTargetScore()
-				+ (delta.getScoreDiff() != 0 ? " (" + (delta.getScoreDiff() > 0 ? "+" : "")
-				+ delta.getScoreDiff() + ")" : "") + "</span>");
-		p.println("      Grade: " + escapeHtml(delta.getBaseGrade())
-				+ " \u2192 " + escapeHtml(delta.getTargetGrade()));
-		for (RiskDelta.DeductionInfo d : delta.getAddedDeductions())
-			p.println("      <span class=\"added\">+ " + escapeHtml(d.getRuleId()
-					+ " " + d.getDescription()) + "</span>");
-		for (RiskDelta.DeductionInfo d : delta.getRemovedDeductions())
-			p.println("      <span class=\"removed\">- " + escapeHtml(d.getRuleId()
-					+ " " + d.getDescription()) + "</span>");
+		if (includeMeta) {
+			String scoreDir = delta.getScoreDiff() > 0 ? "added" : delta.getScoreDiff() < 0 ? "removed" : "changed";
+			p.println("      <span class=\"" + scoreDir + "\">Score: " + delta.getBaseScore()
+					+ " \u2192 " + delta.getTargetScore()
+					+ (delta.getScoreDiff() != 0 ? " (" + (delta.getScoreDiff() > 0 ? "+" : "")
+					+ delta.getScoreDiff() + ")" : "") + "</span>");
+			p.println("      Grade: " + escapeHtml(delta.getBaseGrade())
+					+ " \u2192 " + escapeHtml(delta.getTargetGrade()));
+		}
+		for (RiskDelta.DeductionInfo d : delta.getAddedDeductions()) {
+			String text = includeMeta
+					? escapeHtml(d.getRuleId() + " " + d.getDescription())
+					: escapeHtml(d.getRuleId());
+			p.println("      <span class=\"added\">+ " + text + "</span>");
+		}
+		for (RiskDelta.DeductionInfo d : delta.getRemovedDeductions()) {
+			String text = includeMeta
+					? escapeHtml(d.getRuleId() + " " + d.getDescription())
+					: escapeHtml(d.getRuleId());
+			p.println("      <span class=\"removed\">- " + text + "</span>");
+		}
 		p.println();
 	}
 
 	private static void writeHtmlCipherDelta(PrintWriter p, CipherDelta delta,
-			String host) {
+			String host, boolean includeMeta) {
 		p.println("   <span class=\"section\">[Server cipher suites (" + escapeHtml(host) + ")]</span>");
 		if (delta == null || !delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
 			return;
 		}
-		for (CipherDelta.CipherInfo c : delta.getAddedCiphers())
-			p.println("      <span class=\"added\">+ " + escapeHtml(c.getName()
-					+ " (" + c.getStrength() + ", " + c.getProtocol() + ")") + "</span>");
-		for (CipherDelta.CipherInfo c : delta.getRemovedCiphers())
-			p.println("      <span class=\"removed\">- " + escapeHtml(c.getName()
-					+ " (" + c.getStrength() + ", " + c.getProtocol() + ")") + "</span>");
+		for (CipherDelta.CipherInfo c : delta.getAddedCiphers()) {
+			String text = includeMeta
+					? escapeHtml(c.getName() + " (" + c.getStrength() + ", " + c.getProtocol() + ")")
+					: escapeHtml(c.getName());
+			p.println("      <span class=\"added\">+ " + text + "</span>");
+		}
+		for (CipherDelta.CipherInfo c : delta.getRemovedCiphers()) {
+			String text = includeMeta
+					? escapeHtml(c.getName() + " (" + c.getStrength() + ", " + c.getProtocol() + ")")
+					: escapeHtml(c.getName());
+			p.println("      <span class=\"removed\">- " + text + "</span>");
+		}
 		p.println();
 	}
 
 	private static void writeHtmlMapDelta(PrintWriter p, MapDelta delta,
-			String host) {
+			String host, boolean includeMeta) {
 		if (delta == null) return;
 		p.println("   <span class=\"section\">[" + escapeHtml(delta.getSectionName()) + " (" + escapeHtml(host) + ")]</span>");
 		if (!delta.hasChanges()) {
@@ -2902,34 +2982,45 @@ public class ReportExporter {
 			p.println();
 			return;
 		}
-		for (Map.Entry<String, String> e : delta.getAddedEntries().entrySet())
-			p.println("      <span class=\"added\">+ " + escapeHtml(e.getKey()
-					+ ": " + e.getValue()) + "</span>");
-		for (Map.Entry<String, String[]> e : delta.getChangedEntries().entrySet())
-			p.println("      <span class=\"changed\">~ " + escapeHtml(e.getKey()
-					+ ": \"" + e.getValue()[0] + "\" \u2192 \"" + e.getValue()[1] + "\"") + "</span>");
-		for (Map.Entry<String, String> e : delta.getRemovedEntries().entrySet())
-			p.println("      <span class=\"removed\">- " + escapeHtml(e.getKey()
-					+ ": " + e.getValue()) + "</span>");
+		for (Map.Entry<String, String> e : delta.getAddedEntries().entrySet()) {
+			String text = includeMeta
+					? escapeHtml(e.getKey() + ": " + e.getValue())
+					: escapeHtml(e.getKey());
+			p.println("      <span class=\"added\">+ " + text + "</span>");
+		}
+		for (Map.Entry<String, String[]> e : delta.getChangedEntries().entrySet()) {
+			String text = includeMeta
+					? escapeHtml(e.getKey() + ": \"" + e.getValue()[0] + "\" \u2192 \"" + e.getValue()[1] + "\"")
+					: escapeHtml(e.getKey());
+			p.println("      <span class=\"changed\">~ " + text + "</span>");
+		}
+		for (Map.Entry<String, String> e : delta.getRemovedEntries().entrySet()) {
+			String text = includeMeta
+					? escapeHtml(e.getKey() + ": " + e.getValue())
+					: escapeHtml(e.getKey());
+			p.println("      <span class=\"removed\">- " + text + "</span>");
+		}
 		p.println();
 	}
 
 	private static void writeHtmlFingerprintDelta(PrintWriter p,
-			FingerprintDelta delta, String host) {
+			FingerprintDelta delta, String host, boolean includeMeta) {
 		p.println("   <span class=\"section\">[TLS Probe Fingerprint (" + escapeHtml(host) + ")]</span>");
 		if (delta == null || !delta.hasChanges()) {
 			p.println("      Status=No changes");
 			p.println();
 			return;
 		}
-		if (delta.getBaseHash() != null && delta.getTargetHash() != null) {
-			p.println("      <span class=\"changed\">Hash: " + escapeHtml(delta.getBaseHash())
-					+ " \u2192 " + escapeHtml(delta.getTargetHash()) + "</span>");
+		for (FingerprintDelta.ProbeDiff pd : delta.getProbeDiffs()) {
+			if (includeMeta) {
+				p.println("      <span class=\"changed\">~ Probe " + pd.getProbeNumber()
+						+ ": " + escapeHtml(pd.getBaseCode()) + " \u2192 "
+						+ escapeHtml(pd.getTargetCode()) + "</span>");
+			} else {
+				p.println("      <span class=\"changed\">~ Probe " + pd.getProbeNumber()
+						+ "</span>");
+			}
 		}
-		for (FingerprintDelta.ProbeDiff pd : delta.getProbeDiffs())
-			p.println("      <span class=\"changed\">~ Probe " + pd.getProbeNumber()
-					+ ": " + escapeHtml(pd.getBaseCode()) + " \u2192 "
-					+ escapeHtml(pd.getTargetCode()) + "</span>");
 		p.println();
 	}
 
@@ -2961,11 +3052,14 @@ public class ReportExporter {
 					fontSize, leading, Color.DARK_GRAY, false);
 			addPdfLine(pdfDoc, " ", fontSize, leading, Color.DARK_GRAY, false);
 
-			// Shared risks (always shown, matches on-screen rendering)
-			writePdfSharedRisks(pdfDoc, result, fontSize, leading);
+			// Shared risks (guarded by risk assessment setting)
+			FontPreferences prefs = FontPreferences.load();
+			boolean includeMeta = prefs.isSectionIncludeMetadata();
+			if (prefs.isSectionRiskAssessment()) {
+				writePdfSharedRisks(pdfDoc, result, fontSize, leading);
+			}
 
 			// Workbench-only sections: detailed per-host deltas
-			FontPreferences prefs = FontPreferences.load();
 			if (prefs.isWorkbenchMode()) {
 				addPdfLine(pdfDoc, "[Delta Summary]", 10f, 12f, Color.BLACK, true);
 				addPdfLine(pdfDoc, "  Changed: " + result.getChangedCount()
@@ -2980,20 +3074,27 @@ public class ReportExporter {
 				Color yellow = new Color(255, 193, 7);
 
 				for (HostDelta hd : result.getHostDeltas(HostDelta.HostStatus.CHANGED)) {
+					StringBuilder hostText = new StringBuilder();
+					String host = hd.getNormalizedUrl();
+					if (prefs.isSectionRiskAssessment())
+						appendRiskDeltaText(hostText, hd.getRiskDelta(), host, includeMeta);
+					if (prefs.isSectionCipherSuites())
+						appendCipherDeltaText(hostText, hd.getCipherDelta(), host, includeMeta);
+					if (prefs.isSectionSecurityHeaders())
+						appendMapDeltaText(hostText, hd.getSecurityHeadersDelta(), host, includeMeta);
+					if (prefs.isSectionConnection())
+						appendMapDeltaText(hostText, hd.getConnectionDelta(), host, includeMeta);
+					if (prefs.isSectionHttpResponse())
+						appendMapDeltaText(hostText, hd.getHttpHeadersDelta(), host, includeMeta);
+					if (prefs.isSectionTlsFingerprint())
+						appendFingerprintDeltaText(hostText, hd.getFingerprintDelta(), host, includeMeta);
+
+					if (hostText.length() == 0) continue;
+
 					pdfDoc.newPage();
 					addPdfLine(pdfDoc, "--- " + hd.getNormalizedUrl()
 							+ " (" + hd.getOverallDirection().name() + ") ---",
 							10f, 12f, Color.BLACK, true);
-
-					// Flatten delta text for this host
-					String host = hd.getNormalizedUrl();
-					StringBuilder hostText = new StringBuilder();
-					appendRiskDeltaText(hostText, hd.getRiskDelta(), host);
-					appendCipherDeltaText(hostText, hd.getCipherDelta(), host);
-					appendMapDeltaText(hostText, hd.getSecurityHeadersDelta(), host);
-					appendMapDeltaText(hostText, hd.getConnectionDelta(), host);
-					appendMapDeltaText(hostText, hd.getHttpHeadersDelta(), host);
-					appendFingerprintDeltaText(hostText, hd.getFingerprintDelta(), host);
 
 					for (String line : hostText.toString().split("\n")) {
 						Color lineColor = Color.DARK_GRAY;
@@ -3062,6 +3163,31 @@ public class ReportExporter {
 			}
 			addPdfLine(pdfDoc, " ", fontSize, leading, Color.DARK_GRAY, false);
 		}
+	}
+
+	/**
+	 * Check whether any enabled section has changes for the given host delta.
+	 */
+	private static boolean hasEnabledSections(HostDelta hd, FontPreferences prefs) {
+		if (prefs.isSectionRiskAssessment()
+				&& hd.getRiskDelta() != null && hd.getRiskDelta().hasChanges())
+			return true;
+		if (prefs.isSectionCipherSuites()
+				&& hd.getCipherDelta() != null && hd.getCipherDelta().hasChanges())
+			return true;
+		if (prefs.isSectionSecurityHeaders()
+				&& hd.getSecurityHeadersDelta() != null && hd.getSecurityHeadersDelta().hasChanges())
+			return true;
+		if (prefs.isSectionConnection()
+				&& hd.getConnectionDelta() != null && hd.getConnectionDelta().hasChanges())
+			return true;
+		if (prefs.isSectionHttpResponse()
+				&& hd.getHttpHeadersDelta() != null && hd.getHttpHeadersDelta().hasChanges())
+			return true;
+		if (prefs.isSectionTlsFingerprint()
+				&& hd.getFingerprintDelta() != null && hd.getFingerprintDelta().hasChanges())
+			return true;
+		return false;
 	}
 
 }

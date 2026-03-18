@@ -188,6 +188,7 @@ public class MainFrm extends JFrame {
 	private ScanTask currentScanTask;
 	private long scanStartTime;
 	private ScanResult currentScanResult;
+	private volatile File currentCheckpointFile;
 	private DeltaScanResult currentDeltaResult;
 	private JButton btnTestServers;
 	private DockablePanel dockableResultsPanel;
@@ -366,6 +367,9 @@ public class MainFrm extends JFrame {
 		interfaceItem.addActionListener(e -> showInterfaceHelp());
 		helpMenu.add(interfaceItem);
 		helpMenu.addSeparator();
+		JMenuItem diagnosticsItem = new JMenuItem("Diagnostics");
+		diagnosticsItem.addActionListener(e -> showDiagnosticsDialog());
+		helpMenu.add(diagnosticsItem);
 		JMenuItem aboutItem = new JMenuItem("About");
 		aboutItem.addActionListener(e -> showAboutDialog());
 		helpMenu.add(aboutItem);
@@ -908,6 +912,14 @@ public class MainFrm extends JFrame {
 		aboutDlg.setLocationRelativeTo(this);
 
 		showModalWithOverlay(aboutDlg);
+	}
+
+	/**
+	 * Show the Diagnostics dialog with runtime environment information.
+	 */
+	private void showDiagnosticsDialog() {
+		DiagnosticsDialog dlg = new DiagnosticsDialog(this);
+		showModalWithOverlay(dlg);
 	}
 
 	/**
@@ -2301,6 +2313,10 @@ public class MainFrm extends JFrame {
 
 		scanTask.setWorkerThreadCount(themePrefs.getScanWorkerThreads());
 		scanTask.setThrottleDelayMs(themePrefs.getScanThrottleDelayMs());
+		scanTask.setMaxRetries(themePrefs.getMaxRetries());
+		scanTask.setInitialRetryDelayMs(themePrefs.getInitialRetryDelayMs());
+		scanTask.setMaxRetryDelayMs(themePrefs.getMaxRetryDelayMs());
+		scanTask.setRetryBudgetMs(themePrefs.getRetryBudgetMs());
 
 		// Custom cipher map
 		if (themePrefs.isCustomCipherMapEnabled()) {
@@ -2321,6 +2337,14 @@ public class MainFrm extends JFrame {
 			}
 		}
 
+		// System risk rules overlay
+		if (themePrefs.isSystemRiskRulesEnabled()) {
+			String yaml = FontPreferences.loadSystemRiskRulesYaml();
+			if (yaml != null && !yaml.isBlank()) {
+				scanTask.setSystemRiskRulesYaml(yaml);
+			}
+		}
+
 		// User risk rules
 		if (themePrefs.isUserRiskRulesEnabled()) {
 			String yaml = FontPreferences.loadUserRiskRulesYaml();
@@ -2337,6 +2361,45 @@ public class MainFrm extends JFrame {
 					themePrefs.getAiTemperature(), themePrefs.getAiSystemPrompt(),
 					themePrefs.getAiEndpointUrl());
 		}
+
+		// Restore point — checkpoint every N hosts
+		int restoreInterval = themePrefs.getRestorePointInterval();
+		scanTask.setRestorePointInterval(restoreInterval);
+
+		// Check for existing checkpoint and offer to resume
+		File checkpointFile = new File(scansDir, ".scan-checkpoint.dvscan");
+		if (checkpointFile.exists()) {
+			int choice = JOptionPane.showConfirmDialog(this,
+					"A checkpoint from a previous scan was found.\n"
+					+ "Resume from this checkpoint?",
+					"Resume Scan", JOptionPane.YES_NO_OPTION,
+					JOptionPane.QUESTION_MESSAGE);
+			if (choice == JOptionPane.YES_OPTION) {
+				try {
+					ScanResult checkpoint = ReportExporter.loadScanFile(checkpointFile, null);
+					scanTask.resumeFrom(checkpoint);
+					logger.info("Resuming scan from checkpoint with {} completed hosts",
+							checkpoint.getResults().size());
+				} catch (IOException ex) {
+					logger.warn("Failed to load checkpoint, starting fresh: {}", ex.getMessage());
+				}
+			}
+		}
+		currentCheckpointFile = checkpointFile;
+
+		// Wire checkpoint callback — saves to checkpoint file on worker thread
+		scanTask.setCheckpointCallback(result -> {
+			try {
+				// Save to a temp file first, then rename for atomicity
+				File tmpFile = new File(scansDir, ".scan-checkpoint.tmp");
+				ReportExporter.saveScanFile(tmpFile, result);
+				if (checkpointFile.exists()) checkpointFile.delete();
+				tmpFile.renameTo(checkpointFile);
+				logger.info("Checkpoint saved: {} hosts completed", result.getResults().size());
+			} catch (Exception e) {
+				logger.warn("Failed to save checkpoint: {}", e.getMessage());
+			}
+		});
 
 		scanTask.setCompletionCallback(() ->
 				javax.swing.SwingUtilities.invokeLater(() -> onScanComplete()));
@@ -2430,7 +2493,16 @@ public class MainFrm extends JFrame {
 	private void onScanComplete() {
 		ScanResult result = currentScanTask.getResult();
 		scanTargetFileName = null;
+		boolean wasDelta = currentDeltaResult != null;
 		currentScanResult = result;
+		currentDeltaResult = null;
+		deltaResultsPanel.clearResults();
+
+		// Clean up checkpoint file — scan completed successfully
+		if (currentCheckpointFile != null && currentCheckpointFile.exists()) {
+			currentCheckpointFile.delete();
+			currentCheckpointFile = null;
+		}
 
 		// Update active scan indicator
 		String datetime = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
@@ -2442,6 +2514,12 @@ public class MainFrm extends JFrame {
 
 		// Render results into off-screen styled text pane (for export & AI)
 		renderScanResults(result);
+
+		if (wasDelta) {
+			// Force layout rebuild so the external detail split swaps
+			// from the delta detail pane to the scan detail pane.
+			rebuildScanLayout(dockableResultsPanel.getDockPosition());
+		}
 
 		// Stop status polling; show final worker statuses briefly before completion message
 		if (scanStatusTimer != null) scanStatusTimer.stop();
@@ -2540,7 +2618,7 @@ public class MainFrm extends JFrame {
 			renderHeatMapSection("Revocation Status", result.toRevocationHeatMap(nBlocks), font, nBlocks, headingColor, contentColor);
 		}
 		if (themePrefs.isScanSectionTlsFingerprint()) {
-			renderHeatMapSection("TLS Fingerprint", result.toFingerprintHeatMap(nBlocks), font, nBlocks, headingColor, contentColor);
+			renderHeatMapSection("TLS Probe Fingerprint", result.toFingerprintHeatMap(nBlocks), font, nBlocks, headingColor, contentColor);
 		}
 
 		// Error summary
@@ -2662,6 +2740,7 @@ public class MainFrm extends JFrame {
 		boolean wrap = themePrefs.isHardwrapEnabled();
 		int wrapWidth = themePrefs.getHardwrapWidth();
 		java.util.Set<String> visible = buildVisibleSections();
+		boolean includeMeta = themePrefs.isSectionIncludeMetadata();
 
 		// Track whether we are inside a hidden section so its children
 		// are also skipped during the pre-order walk.
@@ -2672,6 +2751,9 @@ public class MainFrm extends JFrame {
 				if (skipping[0]) return;
 			}
 			if (skipping[0]) return;
+
+			// Skip metadata nodes when metadata display is disabled
+			if (!includeMeta && node.isEffectivelyMeta()) return;
 
 			String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 			switch (node.getType()) {
@@ -2785,7 +2867,7 @@ public class MainFrm extends JFrame {
 			visible.add("Chain details");
 		}
 		if (themePrefs.isSectionRevocation()) visible.add("Certificate revocation status");
-		if (themePrefs.isSectionTlsFingerprint()) visible.add("TLS server fingerprint");
+		if (themePrefs.isSectionTlsFingerprint()) visible.add("TLS Probe Fingerprint");
 		if (themePrefs.isSectionAiEvaluation()) visible.add("AI Evaluation");
 		return visible;
 	}
@@ -2965,10 +3047,18 @@ public class MainFrm extends JFrame {
 					return pwField.getPassword();
 				});
 			}
+			boolean wasDelta = currentDeltaResult != null;
 			currentScanResult = result;
+			currentDeltaResult = null;
+			deltaResultsPanel.clearResults();
 			txtActiveScan.setText("Active Scan: " + file.getAbsolutePath());
 			scanResultsPanel.setResults(result);
 			renderScanResults(result);
+			if (wasDelta) {
+				// Force layout rebuild so the external detail split swaps
+				// from the delta detail pane to the scan detail pane.
+				rebuildScanLayout(dockableResultsPanel.getDockPosition());
+			}
 			updateSaveButtons();
 			setStatusTemporary(STATUS_HDR + "Loaded: " + file.getName());
 		} catch (IOException ex) {
@@ -3302,7 +3392,9 @@ public class MainFrm extends JFrame {
 				ReportExporter.saveAsJson(selectedfile, tree);
 			} else {
 				try (PrintWriter p = new PrintWriter(selectedfile)) {
+					boolean exportMeta = themePrefs.isSectionIncludeMetadata();
 					tree.walkVisible(node -> {
+						if (!exportMeta && node.isEffectivelyMeta()) return;
 						String line = switch (node.getType()) {
 							case SECTION -> "\n[" + node.getKey() + "]\n";
 							case SUBSECTION -> "  " + node.getKey() + ":\n";
@@ -3773,7 +3865,9 @@ public class MainFrm extends JFrame {
 		StringBuilder sb = new StringBuilder();
 		sb.append("=== ").append(hr.getTargetUrl()).append(" ===\n");
 		if (hr.isSuccess() && hr.getScanTree() != null) {
+			boolean hostMeta = themePrefs.isSectionIncludeMetadata();
 			hr.getScanTree().walkVisible(node -> {
+				if (!hostMeta && node.isEffectivelyMeta()) return;
 				String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 				switch (node.getType()) {
 					case SECTION:

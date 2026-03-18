@@ -7,6 +7,7 @@ import com.mps.deepviolettools.model.HeatMapData.HeatMapCell;
 import com.mps.deepviolettools.model.HeatMapData.HeatMapRow;
 import com.mps.deepviolettools.model.HeatMapData.MapType;
 import com.mps.deepviolettools.model.HostDelta.HostStatus;
+import com.mps.deepviolettools.util.FontPreferences;
 
 /**
  * Builds {@link HeatMapData} objects from a {@link DeltaScanResult} for
@@ -33,7 +34,7 @@ public class DeltaHeatMapBuilder {
         int totalHosts = changed.size();
         String[] sectionNames = {
             "Risk Assessment", "Cipher Suites", "Security Headers",
-            "Connection", "HTTP Headers", "Fingerprint"
+            "Connection", "HTTP Headers", "Probe Fingerprint"
         };
 
         List<HeatMapRow> rows = new ArrayList<>();
@@ -62,6 +63,69 @@ public class DeltaHeatMapBuilder {
                             break;
                         case UNCHANGED:
                             // Leave totalCount=0 → gray
+                            break;
+                    }
+                    cells[b].addHostName(hd.getNormalizedUrl());
+                }
+            }
+
+            rows.add(new HeatMapRow("Delta Overview", section, section,
+                    null, cells));
+        }
+
+        return new HeatMapData(MapType.RISK, rows, nBlocks, 1, totalHosts);
+    }
+
+    /**
+     * Build an overview heat map filtered by report section settings.
+     * Only includes rows for sections that are enabled in preferences.
+     */
+    public static HeatMapData buildOverviewHeatMap(DeltaScanResult result,
+                                                    int nBlocks,
+                                                    FontPreferences prefs) {
+        List<HostDelta> changed = result.getHostDeltas(HostStatus.CHANGED);
+        if (changed.isEmpty()) {
+            return new HeatMapData(MapType.RISK, new ArrayList<>(), nBlocks, 1, 0);
+        }
+
+        int totalHosts = changed.size();
+        List<String> filteredSections = new ArrayList<>();
+        if (prefs.isSectionRiskAssessment()) filteredSections.add("Risk Assessment");
+        if (prefs.isSectionCipherSuites()) filteredSections.add("Cipher Suites");
+        if (prefs.isSectionSecurityHeaders()) filteredSections.add("Security Headers");
+        if (prefs.isSectionConnection()) filteredSections.add("Connection");
+        if (prefs.isSectionHttpResponse()) filteredSections.add("HTTP Headers");
+        if (prefs.isSectionTlsFingerprint()) filteredSections.add("Probe Fingerprint");
+
+        if (filteredSections.isEmpty()) {
+            return new HeatMapData(MapType.RISK, new ArrayList<>(), nBlocks, 1, 0);
+        }
+
+        List<HeatMapRow> rows = new ArrayList<>();
+        for (String section : filteredSections) {
+            HeatMapCell[] cells = new HeatMapCell[nBlocks];
+            for (int b = 0; b < nBlocks; b++) {
+                cells[b] = new HeatMapCell(0, 0, 0, null, new ArrayList<>());
+            }
+
+            for (int i = 0; i < totalHosts; i++) {
+                HostDelta hd = changed.get(i);
+                int[] range = HeatMapData.assignBlockRange(i, totalHosts, nBlocks);
+                DeltaDirection dir = getSectionDirection(hd, section);
+
+                for (int b = range[0]; b <= range[1]; b++) {
+                    switch (dir) {
+                        case IMPROVED:
+                            cells[b].addPass();
+                            break;
+                        case DEGRADED:
+                            cells[b].addFail();
+                            break;
+                        case NEUTRAL:
+                        case MIXED:
+                            cells[b].addInconclusive();
+                            break;
+                        case UNCHANGED:
                             break;
                     }
                     cells[b].addHostName(hd.getNormalizedUrl());
