@@ -6,10 +6,10 @@ TLS/SSL scanning tools for security professionals and developers
 [![Black Hat Arsenal](https://github.com/toolswatch/badges/blob/master/arsenal/europe/2016.svg)](http://www.blackhat.com/eu-16/arsenal.html#milton-smith)
 [![Black Hat Arsenal](https://github.com/toolswatch/badges/blob/master/arsenal/usa/2018.svg)](https://www.blackhat.com/us-18/arsenal/schedule/index.html#deepviolet-ssltls-scanning-api-38-tools-10724)
 
-[Documentation](docs/DeepVioletTools.md) |
-[Changes from Upstream](docs/CHANGES.md) |
-[DeepViolet API](https://github.com/spoofzu/DeepViolet/) |
-[Project Blog](https://www.sipsjava.com/blog/)
+<a href="docs/DeepVioletTools.md" target="_blank">Documentation</a> |
+<a href="docs/CHANGES.md" target="_blank">Changes from Upstream</a> |
+<a href="https://github.com/spoofzu/DeepViolet/" target="_blank">DeepViolet API</a> |
+<a href="https://www.sipsjava.com/blog/" target="_blank">Project Blog</a>
 
 ---
 
