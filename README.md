@@ -8,7 +8,8 @@ TLS/SSL scanning tools for security professionals and developers
 
 [Documentation](docs/DeepVioletTools.md) |
 [Changes from Upstream](docs/CHANGES.md) |
-[DeepViolet API](https://github.com/spoofzu/DeepViolet/)
+[DeepViolet API](https://github.com/spoofzu/DeepViolet/) |
+[Project Blog](https://www.sipsjava.com/blog/)
 
 ---
 
