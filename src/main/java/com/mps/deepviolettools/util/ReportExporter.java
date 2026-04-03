@@ -8,9 +8,11 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -202,8 +204,10 @@ public class ReportExporter {
 	 */
 	public static void saveAsJson(File file, ScanNode root) throws IOException {
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		FontPreferences prefs = FontPreferences.load();
+		Set<String> visible = buildVisibleSections(prefs);
 		try (FileWriter writer = new FileWriter(file)) {
-			gson.toJson(toJsonMap(root), writer);
+			gson.toJson(toJsonMap(root, visible), writer);
 		}
 	}
 
@@ -222,6 +226,15 @@ public class ReportExporter {
 	 * warnings/content become arrays.
 	 */
 	public static Map<String, Object> toJsonMap(ScanNode root) {
+		return toJsonMap(root, null);
+	}
+
+	/**
+	 * Convert a ScanNode tree to a nested Map, filtering to only
+	 * the given visible sections. Pass null to include all sections.
+	 */
+	public static Map<String, Object> toJsonMap(ScanNode root,
+			Set<String> visible) {
 		Map<String, Object> result = new LinkedHashMap<>();
 		result.put("report_version", UIBackgroundScanTask.REPORT_VERSION);
 
@@ -245,6 +258,7 @@ public class ReportExporter {
 
 		for (ScanNode section : root.getChildren()) {
 			if (section.getType() == ScanNode.NodeType.SECTION) {
+				if (visible != null && !visible.contains(section.getKey())) continue;
 				result.put(section.getKey(), buildSectionMap(section));
 			}
 		}
@@ -329,8 +343,11 @@ public class ReportExporter {
 			boolean wrap = prefs.isHardwrapEnabled();
 			int wrapWidth = prefs.getHardwrapWidth();
 			boolean includeMeta = prefs.isSectionIncludeMetadata();
+			Set<String> visible = buildVisibleSections(prefs);
+			final boolean[] skipping = {false};
 
 			root.walkVisible(node -> {
+				if (isSectionSkipped(node, visible, skipping)) return;
 				if (!includeMeta && node.isEffectivelyMeta()) return;
 				String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 				switch (node.getType()) {
@@ -342,8 +359,14 @@ public class ReportExporter {
 						p.println("<span class=\"heading\">[" + escapeHtml(node.getKey()) + "]</span>");
 						break;
 					case SUBSECTION:
-						p.print(htmlWrappedSingle(indent + node.getKey() + ":",
-							indent + "   ", wrap, wrapWidth, "subsection"));
+						if (node.getSeverity() != null) {
+							String subSevColor = toHtmlColor(prefs.getColorForSeverity(node.getSeverity()));
+							p.print(htmlWrappedSingleInline(indent + node.getKey() + ":",
+								indent + "   ", wrap, wrapWidth, subSevColor, true));
+						} else {
+							p.print(htmlWrappedSingle(indent + node.getKey() + ":",
+								indent + "   ", wrap, wrapWidth, "subsection"));
+						}
 						break;
 					case KEY_VALUE:
 						String kvLine = indent + node.getKey() + "=" + node.getValue();
@@ -357,8 +380,14 @@ public class ReportExporter {
 						}
 						break;
 					case WARNING:
-						p.print(htmlWrappedSingle(indent + node.getKey(),
-								indent + "   ", wrap, wrapWidth, "warning"));
+						if (node.getSeverity() != null) {
+							String warnSevColor = toHtmlColor(prefs.getColorForSeverity(node.getSeverity()));
+							p.print(htmlWrappedSingleInline(indent + node.getKey(),
+									indent + "   ", wrap, wrapWidth, warnSevColor, true));
+						} else {
+							p.print(htmlWrappedSingle(indent + node.getKey(),
+									indent + "   ", wrap, wrapWidth, "warning"));
+						}
 						break;
 					case CONTENT:
 						String contentLine = indent + node.getKey();
@@ -420,9 +449,12 @@ public class ReportExporter {
 			final float fontSize = Math.max(availableWidth / (targetChars * 0.6f), 6f);
 			final float leading = fontSize * 1.15f;
 			boolean includeMeta = prefs.isSectionIncludeMetadata();
+			Set<String> visible = buildVisibleSections(prefs);
+			final boolean[] skipping = {false};
 
 			root.walkVisible(node -> {
 				try {
+					if (isSectionSkipped(node, visible, skipping)) return;
 					if (!includeMeta && node.isEffectivelyMeta()) return;
 					String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
 					switch (node.getType()) {
@@ -437,9 +469,12 @@ public class ReportExporter {
 									leading, prefs.getHeading(), true);
 							break;
 						case SUBSECTION:
+							Color pdfSubColor2 = node.getSeverity() != null
+									? prefs.getColorForSeverity(node.getSeverity())
+									: prefs.getSubsection();
 							addPdfWrappedSingle(pdfDoc, indent + node.getKey() + ":",
 									indent + "   ", wrap, wrapWidth, fontSize, leading,
-									prefs.getSubsection(), true);
+									pdfSubColor2, true);
 							break;
 						case KEY_VALUE:
 							String kvLine = indent + node.getKey() + "=" + node.getValue();
@@ -454,9 +489,12 @@ public class ReportExporter {
 							}
 							break;
 						case WARNING:
+							Color pdfWarnColor2 = node.getSeverity() != null
+									? prefs.getColorForSeverity(node.getSeverity())
+									: prefs.getWarning();
 							addPdfWrappedSingle(pdfDoc, indent + node.getKey(),
 									indent + "   ", wrap, wrapWidth, fontSize, leading,
-									prefs.getWarning(), true);
+									pdfWarnColor2, true);
 							break;
 						case CONTENT:
 							String pdfContent = indent + node.getKey();
@@ -570,6 +608,42 @@ public class ReportExporter {
 				segment = contIndent + segment.trim();
 			}
 			sb.append("<span class=\"").append(cssClass).append("\">")
+			  .append(escapeHtml(segment)).append("</span>\n");
+			pos = end;
+			first = false;
+		}
+		return sb.toString();
+	}
+
+	/**
+	 * Like {@link #htmlWrappedSingle} but emits inline style instead of a CSS class.
+	 */
+	static String htmlWrappedSingleInline(String text, String contIndent,
+			boolean wrap, int wrapWidth, String color, boolean bold) {
+		String style = "color:" + color + (bold ? ";font-weight:bold" : "");
+		StringBuilder sb = new StringBuilder();
+		if (!wrap || text.length() <= wrapWidth) {
+			sb.append("<span style=\"").append(style).append("\">")
+			  .append(escapeHtml(text)).append("</span>\n");
+			return sb.toString();
+		}
+		int pos = 0;
+		boolean first = true;
+		while (pos < text.length()) {
+			int available = first ? wrapWidth : wrapWidth - contIndent.length();
+			if (available <= 0) available = 20;
+			int remaining = text.length() - pos;
+			int end;
+			if (remaining <= available) {
+				end = text.length();
+			} else {
+				end = pos + findBreakPoint(text.substring(pos), available);
+			}
+			String segment = text.substring(pos, end);
+			if (!first) {
+				segment = contIndent + segment.trim();
+			}
+			sb.append("<span style=\"").append(style).append("\">")
 			  .append(escapeHtml(segment)).append("</span>\n");
 			pos = end;
 			first = false;
@@ -1162,6 +1236,61 @@ public class ReportExporter {
 	}
 
 	/**
+	 * Build the set of visible section names based on preferences.
+	 * In normal mode only "TLS Risk Assessment" is visible.
+	 * In workbench mode each section is checked individually.
+	 * Returns null when all sections are enabled (no filtering needed).
+	 */
+	public static Set<String> buildVisibleSections(FontPreferences prefs) {
+		if (!prefs.isWorkbenchMode()) {
+			Set<String> visible = new HashSet<>();
+			visible.add("TLS Risk Assessment");
+			return visible;
+		}
+		if (prefs.isSectionRiskAssessment()
+				&& prefs.isSectionRuntimeEnvironment()
+				&& prefs.isSectionHost()
+				&& prefs.isSectionHttpResponse()
+				&& prefs.isSectionSecurityHeaders()
+				&& prefs.isSectionConnection()
+				&& prefs.isSectionCipherSuites()
+				&& prefs.isSectionCertChain()
+				&& prefs.isSectionRevocation()
+				&& prefs.isSectionTlsFingerprint()) {
+			return null;
+		}
+		Set<String> visible = new HashSet<>();
+		if (prefs.isSectionRiskAssessment()) visible.add("TLS Risk Assessment");
+		if (prefs.isSectionRuntimeEnvironment()) visible.add("Runtime environment");
+		if (prefs.isSectionHost()) visible.add("Host information");
+		if (prefs.isSectionHttpResponse()) visible.add("HTTP(S) response headers");
+		if (prefs.isSectionSecurityHeaders()) visible.add("Security headers analysis");
+		if (prefs.isSectionConnection()) visible.add("Connection characteristics");
+		if (prefs.isSectionCipherSuites()) visible.add("Server cipher suites");
+		if (prefs.isSectionCertChain()) {
+			visible.add("Server certificate chain");
+			visible.add("Chain details");
+		}
+		if (prefs.isSectionRevocation()) visible.add("Certificate revocation status");
+		if (prefs.isSectionTlsFingerprint()) visible.add("TLS Probe Fingerprint");
+		if (prefs.isSectionAiEvaluation()) visible.add("AI Evaluation");
+		return visible;
+	}
+
+	/**
+	 * Check whether a section node should be skipped based on visible sections.
+	 * Returns true if the section should be skipped.
+	 */
+	private static boolean isSectionSkipped(ScanNode node, Set<String> visible,
+			boolean[] skipping) {
+		if (node.getType() == ScanNode.NodeType.SECTION) {
+			skipping[0] = visible != null && !visible.contains(node.getKey());
+			return skipping[0];
+		}
+		return skipping[0];
+	}
+
+	/**
 	 * Save scan results as HTML with colored heat map tables.
 	 */
 	public static void saveScanAsHtml(File file,
@@ -1197,13 +1326,12 @@ public class ReportExporter {
 			Color failColor = prefs.getRiskFail();
 			Color incColor = prefs.getRiskInconclusive();
 
-			writeHtmlHeatMap(p, "TLS Risk Assessment", result.toRiskHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "Security Headers Analysis", result.toSecurityHeadersHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "HTTP Response Headers", result.toHttpResponseHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "Connection Characteristics", result.toConnectionHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "Cipher Suites", result.toCipherHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "Revocation Status", result.toRevocationHeatMap(nBlocks), passColor, failColor, incColor);
-			writeHtmlHeatMap(p, "TLS Probe Fingerprint", result.toFingerprintHeatMap(nBlocks), passColor, failColor, incColor);
+			List<String> titles = new ArrayList<>();
+			List<com.mps.deepviolettools.model.HeatMapData> maps = new ArrayList<>();
+			buildFilteredSections(result, nBlocks, prefs, titles, maps);
+			for (int i = 0; i < titles.size(); i++) {
+				writeHtmlHeatMap(p, titles.get(i), maps.get(i), passColor, failColor, incColor);
+			}
 
 			// Error summary
 			boolean hasErrors = false;
@@ -1413,12 +1541,12 @@ public class ReportExporter {
 	 * Write tree nodes as HTML (shared by single-host and multi-host export).
 	 */
 	private static void writeHtmlTreeNodes(PrintWriter p, ScanNode root,
-			boolean wrap, int wrapWidth) {
-		writeHtmlTreeNodes(p, root, wrap, wrapWidth, true);
+			boolean wrap, int wrapWidth, FontPreferences prefs) {
+		writeHtmlTreeNodes(p, root, wrap, wrapWidth, true, prefs);
 	}
 
 	private static void writeHtmlTreeNodes(PrintWriter p, ScanNode root,
-			boolean wrap, int wrapWidth, boolean includeMeta) {
+			boolean wrap, int wrapWidth, boolean includeMeta, FontPreferences prefs) {
 		root.walkVisible(node -> {
 			if (!includeMeta && node.isEffectivelyMeta()) return;
 			String indent = "   ".repeat(Math.max(0, node.getLevel() - 1));
@@ -1431,8 +1559,14 @@ public class ReportExporter {
 					p.println("<span class=\"heading\">[" + escapeHtml(node.getKey()) + "]</span>");
 					break;
 				case SUBSECTION:
-					p.print(htmlWrappedSingle(indent + node.getKey() + ":",
-						indent + "   ", wrap, wrapWidth, "subsection"));
+					if (node.getSeverity() != null) {
+						String subSevColor = toHtmlColor(prefs.getColorForSeverity(node.getSeverity()));
+						p.print(htmlWrappedSingleInline(indent + node.getKey() + ":",
+							indent + "   ", wrap, wrapWidth, subSevColor, true));
+					} else {
+						p.print(htmlWrappedSingle(indent + node.getKey() + ":",
+							indent + "   ", wrap, wrapWidth, "subsection"));
+					}
 					break;
 				case KEY_VALUE:
 					String kvLine = indent + node.getKey() + "=" + node.getValue();
@@ -1446,8 +1580,14 @@ public class ReportExporter {
 					}
 					break;
 				case WARNING:
-					p.print(htmlWrappedSingle(indent + node.getKey(),
-							indent + "   ", wrap, wrapWidth, "warning"));
+					if (node.getSeverity() != null) {
+						String warnSevColor = toHtmlColor(prefs.getColorForSeverity(node.getSeverity()));
+						p.print(htmlWrappedSingleInline(indent + node.getKey(),
+								indent + "   ", wrap, wrapWidth, warnSevColor, true));
+					} else {
+						p.print(htmlWrappedSingle(indent + node.getKey(),
+								indent + "   ", wrap, wrapWidth, "warning"));
+					}
 					break;
 				case CONTENT:
 					String contentLine = indent + node.getKey();
@@ -1578,9 +1718,12 @@ public class ReportExporter {
 								leading, prefs.getHeading(), true);
 						break;
 					case SUBSECTION:
+						Color pdfSubColor = node.getSeverity() != null
+								? prefs.getColorForSeverity(node.getSeverity())
+								: prefs.getSubsection();
 						addPdfWrappedSingle(pdfDoc, indent + node.getKey() + ":",
 								indent + "   ", wrap, wrapWidth, fontSize, leading,
-								prefs.getSubsection(), true);
+								pdfSubColor, true);
 						break;
 					case KEY_VALUE:
 						String kvLine = indent + node.getKey() + "=" + node.getValue();
@@ -1595,9 +1738,12 @@ public class ReportExporter {
 						}
 						break;
 					case WARNING:
+						Color pdfWarnColor = node.getSeverity() != null
+								? prefs.getColorForSeverity(node.getSeverity())
+								: prefs.getWarning();
 						addPdfWrappedSingle(pdfDoc, indent + node.getKey(),
 								indent + "   ", wrap, wrapWidth, fontSize, leading,
-								prefs.getWarning(), true);
+								pdfWarnColor, true);
 						break;
 					case CONTENT:
 						String pdfContent = indent + node.getKey();
@@ -1722,8 +1868,9 @@ public class ReportExporter {
 	public static void saveScanAsJson(File file,
 			com.mps.deepviolettools.model.ScanResult result) throws IOException {
 		Gson gson = new GsonBuilder().setPrettyPrinting().create();
+		FontPreferences prefs = FontPreferences.load();
 		try (FileWriter writer = new FileWriter(file)) {
-			writer.write(buildScanJsonString(result, gson));
+			writer.write(buildScanJsonString(result, gson, prefs));
 		}
 	}
 
@@ -1731,7 +1878,8 @@ public class ReportExporter {
 	 * Build the scan JSON string from a ScanResult.
 	 */
 	private static String buildScanJsonString(
-			com.mps.deepviolettools.model.ScanResult result, Gson gson) {
+			com.mps.deepviolettools.model.ScanResult result, Gson gson,
+			FontPreferences prefs) {
 		Map<String, Object> jsonMap = new LinkedHashMap<>();
 		jsonMap.put("report_type", "scan");
 		jsonMap.put("total_targets", result.getTotalTargets());
@@ -1750,19 +1898,19 @@ public class ReportExporter {
 			if (hr.getErrorMessage() != null) {
 				hostMap.put("error", hr.getErrorMessage());
 			}
-			if (hr.getSecurityHeaders() != null) {
+			if (prefs.isScanSectionSecurityHeaders() && hr.getSecurityHeaders() != null) {
 				hostMap.put("security_headers", hr.getSecurityHeaders());
 			}
-			if (hr.getConnProperties() != null) {
+			if (prefs.isScanSectionConnection() && hr.getConnProperties() != null) {
 				hostMap.put("connection_properties", hr.getConnProperties());
 			}
-			if (hr.getHttpHeaders() != null) {
+			if (prefs.isScanSectionHttpResponse() && hr.getHttpHeaders() != null) {
 				hostMap.put("http_headers", hr.getHttpHeaders());
 			}
-			if (hr.getTlsFingerprint() != null) {
+			if (prefs.isScanSectionTlsFingerprint() && hr.getTlsFingerprint() != null) {
 				hostMap.put("tls_fingerprint", hr.getTlsFingerprint());
 			}
-			if (hr.getRiskScore() != null) {
+			if (prefs.isScanSectionRiskAssessment() && hr.getRiskScore() != null) {
 				Map<String, Object> risk = new LinkedHashMap<>();
 				risk.put("total_score", hr.getRiskScore().getTotalScore());
 				risk.put("letter_grade", hr.getRiskScore().getLetterGrade().name());
@@ -1801,7 +1949,7 @@ public class ReportExporter {
 
 				hostMap.put("risk_score", risk);
 			}
-			if (hr.getCiphers() != null) {
+			if (prefs.isScanSectionCipherSuites() && hr.getCiphers() != null) {
 				List<Map<String, String>> cipherList = new ArrayList<>();
 				for (ICipherSuite cs : hr.getCiphers()) {
 					Map<String, String> c = new LinkedHashMap<>();
@@ -1876,25 +2024,15 @@ public class ReportExporter {
 				}
 			}
 
-			String[] titles = {
-				"TLS Risk Assessment", "Security Headers Analysis",
-				"HTTP Response Headers", "Connection Characteristics", "Cipher Suites",
-				"Revocation Status", "TLS Probe Fingerprint"
-			};
-			com.mps.deepviolettools.model.HeatMapData[] maps = {
-				result.toRiskHeatMap(nBlocks),
-				result.toSecurityHeadersHeatMap(nBlocks),
-				result.toHttpResponseHeatMap(nBlocks),
-				result.toConnectionHeatMap(nBlocks),
-				result.toCipherHeatMap(nBlocks),
-				result.toRevocationHeatMap(nBlocks),
-				result.toFingerprintHeatMap(nBlocks)
-			};
+			FontPreferences prefs = FontPreferences.load();
+			List<String> titles = new ArrayList<>();
+			List<com.mps.deepviolettools.model.HeatMapData> maps = new ArrayList<>();
+			buildFilteredSections(result, nBlocks, prefs, titles, maps);
 
-			for (int m = 0; m < titles.length; m++) {
+			for (int m = 0; m < titles.size(); m++) {
 				pdfDoc.newPage();
-				addPdfLine(pdfDoc, titles[m], 12f, 14f, Color.BLACK, true);
-				addPdfHeatMapTable(pdfDoc, maps[m], passColor, failColor, inconclusiveColor);
+				addPdfLine(pdfDoc, titles.get(m), 12f, 14f, Color.BLACK, true);
+				addPdfHeatMapTable(pdfDoc, maps.get(m), passColor, failColor, inconclusiveColor);
 			}
 
 		} catch (com.lowagie.text.DocumentException e) {

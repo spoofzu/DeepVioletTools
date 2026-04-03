@@ -2835,41 +2835,7 @@ public class MainFrm extends JFrame {
 	 * current section preferences. Returns null if all sections are enabled.
 	 */
 	private java.util.Set<String> buildVisibleSections() {
-		// Normal mode: only show risk assessment regardless of stored prefs
-		if (!themePrefs.isWorkbenchMode()) {
-			java.util.Set<String> visible = new java.util.HashSet<>();
-			visible.add("TLS Risk Assessment");
-			return visible;
-		}
-		// Workbench mode: if all sections are enabled, return null (no filtering)
-		if (themePrefs.isSectionRiskAssessment()
-				&& themePrefs.isSectionRuntimeEnvironment()
-				&& themePrefs.isSectionHost()
-				&& themePrefs.isSectionHttpResponse()
-				&& themePrefs.isSectionSecurityHeaders()
-				&& themePrefs.isSectionConnection()
-				&& themePrefs.isSectionCipherSuites()
-				&& themePrefs.isSectionCertChain()
-				&& themePrefs.isSectionRevocation()
-				&& themePrefs.isSectionTlsFingerprint()) {
-			return null;
-		}
-		java.util.Set<String> visible = new java.util.HashSet<>();
-		if (themePrefs.isSectionRiskAssessment()) visible.add("TLS Risk Assessment");
-		if (themePrefs.isSectionRuntimeEnvironment()) visible.add("Runtime environment");
-		if (themePrefs.isSectionHost()) visible.add("Host information");
-		if (themePrefs.isSectionHttpResponse()) visible.add("HTTP(S) response headers");
-		if (themePrefs.isSectionSecurityHeaders()) visible.add("Security headers analysis");
-		if (themePrefs.isSectionConnection()) visible.add("Connection characteristics");
-		if (themePrefs.isSectionCipherSuites()) visible.add("Server cipher suites");
-		if (themePrefs.isSectionCertChain()) {
-			visible.add("Server certificate chain");
-			visible.add("Chain details");
-		}
-		if (themePrefs.isSectionRevocation()) visible.add("Certificate revocation status");
-		if (themePrefs.isSectionTlsFingerprint()) visible.add("TLS Probe Fingerprint");
-		if (themePrefs.isSectionAiEvaluation()) visible.add("AI Evaluation");
-		return visible;
+		return ReportExporter.buildVisibleSections(themePrefs);
 	}
 
 	/**
@@ -3393,7 +3359,14 @@ public class MainFrm extends JFrame {
 			} else {
 				try (PrintWriter p = new PrintWriter(selectedfile)) {
 					boolean exportMeta = themePrefs.isSectionIncludeMetadata();
+					java.util.Set<String> visibleSec = ReportExporter.buildVisibleSections(themePrefs);
+					final boolean[] skipSec = {false};
 					tree.walkVisible(node -> {
+						if (node.getType() == ScanNode.NodeType.SECTION) {
+							skipSec[0] = visibleSec != null && !visibleSec.contains(node.getKey());
+							if (skipSec[0]) return;
+						}
+						if (skipSec[0]) return;
 						if (!exportMeta && node.isEffectivelyMeta()) return;
 						String line = switch (node.getType()) {
 							case SECTION -> "\n[" + node.getKey() + "]\n";
